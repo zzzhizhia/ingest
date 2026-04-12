@@ -125,9 +125,9 @@ const SYSTEM_PROMPT = `\
 
 ## 完成所有文件后
 
-更新 summary.org：
-- 仪表盘：统计各分类文件的 heading 数量（\`grep -c "^\\* " *.org\`），更新数字。
-- 日志：在当前月份标题下追加一行：\`** [YYYY-MM-DD DDD] ingest | 标题 | +N ~M\`
+在 summary.org 日志部分当前月份标题下追加一行（仪表盘由 org-babel 自动维护，不要修改）：
+
+\`** [YYYY-MM-DD DDD] ingest | 标题 | +N ~M\`
 
 ## 禁止事项
 
