@@ -57,24 +57,25 @@ const ALLOWED_TOOLS = [
   "Bash(git log *)",
 ].join(",");
 
-function buildPrompt(file: string): string {
+function buildPrompt(files: string[]): string {
+  const list = files.map((f, i) => `${i + 1}. ${f}`).join("\n");
   return (
-    `按 CLAUDE.md § 3.1 消化工作流，执行步骤 1-8 并更新 summary.org` +
-    `（步骤 9 中的 3.0.1 仪表盘和 3.0.2 日志部分），` +
-    `不要 git commit，不要运行 update-lock.js。消化以下源文件：\n\n${file}`
+    `按 CLAUDE.md § 3.1 消化工作流，依次消化以下 ${files.length} 个源文件，` +
+    `每个文件执行完整的步骤 1-8 后再处理下一个，全部完成后统一更新 summary.org` +
+    `（步骤 9 中的 3.0.1 仪表盘和 3.0.2 日志部分）。` +
+    `不要 git commit，不要运行 update-lock.js。\n\n${list}`
   );
 }
 
-function runClaude(orgRoot: string, file: string): boolean {
+function runClaude(orgRoot: string, files: string[]): boolean {
   const result = spawnSync(
     "claude",
     [
       "-p",
-      "--permission-mode",
-      "dontAsk",
-      "--allowedTools",
-      ALLOWED_TOOLS,
-      buildPrompt(file),
+      "--model", "sonnet",
+      "--permission-mode", "dontAsk",
+      "--allowedTools", ALLOWED_TOOLS,
+      buildPrompt(files),
     ],
     { cwd: orgRoot, stdio: ["ignore", "inherit", "inherit"] },
   );
@@ -102,7 +103,7 @@ const WIKI_FILES = [
   ".ingest-lock.json",
 ];
 
-function commitIngest(orgRoot: string, file: string): void {
+function commitIngest(orgRoot: string, files: string[]): void {
   const hasChanges =
     execFileSync("git", ["status", "--porcelain", ...WIKI_FILES], {
       cwd: orgRoot,
@@ -112,12 +113,13 @@ function commitIngest(orgRoot: string, file: string): void {
 
   if (!hasChanges) return;
 
+  const label =
+    files.length === 1
+      ? basename(files[0])
+      : `${files.length} files`;
+
   execFileSync("git", ["add", ...WIKI_FILES], { cwd: orgRoot });
-  execFileSync(
-    "git",
-    ["commit", "-m", `[ingest] ${basename(file)}`],
-    { cwd: orgRoot },
-  );
+  execFileSync("git", ["commit", "-m", `[ingest] ${label}`], { cwd: orgRoot });
 }
 
 // ── interactive selection ─────────────────────────────────────────────────────
@@ -177,34 +179,26 @@ async function main(): Promise<void> {
   }
 
   console.log();
-  let failed = 0;
+  console.log(
+    "─".repeat(60) + "\n" +
+    toIngest.map((f, i) => pc.bold(`${i + 1}.`) + " " + f).join("\n") + "\n",
+  );
 
-  for (const file of toIngest) {
-    console.log("─".repeat(60));
-    console.log(pc.bold("▶") + " " + file + "\n");
+  const ok = runClaude(orgRoot, toIngest);
 
-    const ok = runClaude(orgRoot, file);
-
-    if (ok) {
-      writeLockEntry(orgRoot, file, []);
-      try {
-        commitIngest(orgRoot, file);
-        console.log("\n" + pc.green("✓") + " 完成");
-      } catch (e) {
-        console.warn(pc.yellow("⚠") + " git commit 失败:", (e as Error).message);
-      }
-    } else {
-      console.error("\n" + pc.red("✗") + " Claude 退出非零");
-      failed++;
+  if (ok) {
+    for (const file of toIngest) writeLockEntry(orgRoot, file, []);
+    try {
+      commitIngest(orgRoot, toIngest);
+      console.log(pc.green("✓") + " 完成");
+    } catch (e) {
+      console.warn(pc.yellow("⚠") + " git commit 失败:", (e as Error).message);
     }
-
-    console.log();
-  }
-
-  if (failed > 0) {
-    console.error(pc.red(`${failed} 个文件消化失败`));
+  } else {
+    console.error(pc.red("✗") + " Claude 退出非零");
     process.exit(1);
   }
+
 
   gitPush(orgRoot);
 }
