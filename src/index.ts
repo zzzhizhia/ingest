@@ -249,12 +249,13 @@ async function main(): Promise<void> {
 
   gitPull(orgRoot);
 
-  const explicitFiles = process.argv.slice(2);
+  const args = process.argv.slice(2);
+  const allFlag = args.includes("--all") || args.includes("-a");
+  const explicitFiles = args.filter((a) => !a.startsWith("-"));
 
   let toIngest: string[];
 
   if (explicitFiles.length > 0) {
-    // Non-interactive: ingest specified files directly
     toIngest = explicitFiles;
   } else {
     const lock = readLock(orgRoot);
@@ -270,11 +271,14 @@ async function main(): Promise<void> {
         pc.dim("  (org: " + orgRoot + ")\n"),
     );
 
-    toIngest = await selectFiles(pending);
-
-    if (toIngest.length === 0) {
-      console.log(pc.dim("skipped"));
-      return;
+    if (allFlag) {
+      toIngest = pending.map((f) => f.rel);
+    } else {
+      toIngest = await selectFiles(pending);
+      if (toIngest.length === 0) {
+        console.log(pc.dim("skipped"));
+        return;
+      }
     }
   }
 
