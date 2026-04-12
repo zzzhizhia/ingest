@@ -2,14 +2,18 @@
 
 Interactive CLI for ingesting raw source files into an org-mode LLM wiki via `claude -p`.
 
-## Quick Start
+## Install
 
 ```bash
-ingest         # interactive: pick files from a checkbox
-ingest --all   # non-interactive: ingest all pending files
+npm install -g ingest
 ```
 
-Run from your org directory (or any subdirectory). The repo root is detected by the presence of `raw/` and `CLAUDE.md`.
+Or link locally for development:
+
+```bash
+cd ~/Developer/zzzhizhia/ingest
+pnpm link --global
+```
 
 ## Usage
 
@@ -21,27 +25,100 @@ ingest
 ingest --all
 ingest -a
 
-# Ingest specific files directly
-ingest raw/clips/sspai/article.org raw/repos/project/notes.md
+# Ingest specific files directly (skips pending scan)
+ingest raw/clips/sspai/article.org
+ingest raw/clips/foo.org raw/repos/bar/notes.md
 ```
 
-## What it does
+## Full Flow
 
-1. `git pull --ff-only`
-2. Scans `raw/` and compares SHA-256 hashes against `.ingest-lock.json` — finds new and updated files
-3. Shows an interactive checkbox to select which files to process (skipped with `--all`)
-4. Runs a single `claude -p --model sonnet` session with all selected files — Claude reads each source, extracts entities/concepts, writes wiki pages, updates `summary.org` log
-5. Writes lock entries to `.ingest-lock.json`
-6. `git commit` with all changed wiki files + lock in one commit
-7. `git push`
+```
+git pull --ff-only
+  ↓
+Scan raw/ vs .ingest-lock.json → find new + updated files
+  ↓
+Interactive checkbox (skipped with --all or explicit paths)
+  ↓
+Single claude -p --model sonnet session
+  • Reads each source file
+  • Extracts entities, concepts, key arguments
+  • Writes/updates pages in entities.org, concepts.org, sources.org, analyses.org
+  • Appends ingest entry to summary.org log
+  ↓
+Write lock entries to .ingest-lock.json (one per file)
+  ↓
+git add wiki files + .ingest-lock.json
+git commit "[ingest] <label>"
+  ↓
+git push
+```
 
-Claude's ingest instructions are embedded in the CLI — no dependency on `CLAUDE.md` content.
+## Pending File Detection
+
+A file is considered pending if:
+
+- Its path is **not in** `.ingest-lock.json` → status `new`
+- Its path is in the lock but its **SHA-256 hash changed** → status `updated`
+
+Files with a matching hash in the lock are skipped. The lock stores:
+
+```json
+{
+  "version": 1,
+  "files": {
+    "raw/clips/sspai/article.org": {
+      "ingestedAt": "2026-04-12T08:00:00.000Z",
+      "contentHash": "sha256:a3f2c1...",
+      "wikiPages": []
+    }
+  }
+}
+```
+
+Supported extensions: `.org`, `.md`, `.txt`.
+
+## What Claude Does
+
+Claude runs as a single `claude -p --model sonnet` session with all selected files. Its instructions are embedded in the CLI — it does not read `CLAUDE.md`.
+
+For each source file, Claude:
+
+1. Reads the file (chunked if > 200 KB)
+2. Checks for existing wiki pages (`grep SOURCES:` in wiki files)
+3. Extracts entities, concepts, and key arguments with section-level attribution
+4. Matches existing headings (fuzzy) or appends new ones
+5. Writes pages following the org-mode wiki template, with source citations and confidence levels (`HIGH` / `MED` / `LOW`)
+6. Flags contradictions between new content and existing wiki pages
+
+After all files are processed, Claude appends an entry to `summary.org` log.
+
+Claude is **not** responsible for git commits or lock updates — the CLI handles both.
+
+### Allowed Tools
+
+Claude is restricted to the minimum required:
+
+| Tool | Purpose |
+|------|---------|
+| `Read` | Read source files and wiki files |
+| `Edit` | Write to wiki files |
+| `Bash(date *)` | Generate `YYYYMMDDTHHMMSS` IDs |
+| `Bash(grep *)` | Search for existing headings |
+| `Bash(git status)` | Check repo state |
+| `Bash(git log *)` | Read recent commit history |
+
+Git commits and lock writes are intentionally excluded — the CLI owns those.
+
+## Org Root Detection
+
+The CLI walks up from the current directory looking for a folder that contains both `raw/` and `CLAUDE.md`. Run from anywhere inside your org repo.
 
 ## Requirements
 
 - Node >= 20
-- `claude` CLI in PATH (`npm install -g @anthropic-ai/claude-code`)
-- `raw/` directory and `CLAUDE.md` present in the org repo root (used for root detection)
+- `claude` CLI in PATH — install via `npm install -g @anthropic-ai/claude-code`
+- An org repo with `raw/` directory, `CLAUDE.md`, and `.ingest-lock.json` at the root
+  (`.ingest-lock.json` is created automatically on first run if missing)
 
 ## License
 
