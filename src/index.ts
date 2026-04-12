@@ -214,13 +214,23 @@ function runClaude(orgRoot: string, files: string[]): boolean {
 // ── git helpers ───────────────────────────────────────────────────────────────
 
 function gitPull(orgRoot: string): void {
+  const stash = spawnSync("git", ["stash", "--include-untracked"], {
+    cwd: orgRoot,
+    encoding: "utf8",
+  });
+  const didStash = stash.status === 0 && !stash.stdout.includes("No local changes");
+
   const result = spawnSync("git", ["pull", "--ff-only"], {
     cwd: orgRoot,
     encoding: "utf8",
   });
-  if (result.status !== 0) throw new Error(result.stderr ?? "git pull failed");
+
+  if (didStash) spawnSync("git", ["stash", "pop"], { cwd: orgRoot });
+
+  if (result.status !== 0) throw new Error(result.stderr?.trim() ?? "git pull failed");
   const out = result.stdout.trim();
-  console.log(pc.dim("↓ " + (out === "Already up to date." ? "already up to date" : out.split("\n")[0])));
+  const msg = out === "Already up to date." ? "already up to date" : out.split("\n")[0];
+  console.log(pc.dim("↓ " + msg + (didStash ? " (stashed/popped)" : "")));
 }
 
 function gitPush(orgRoot: string): void {
