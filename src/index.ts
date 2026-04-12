@@ -156,21 +156,39 @@ function runClaude(orgRoot: string, files: string[]): boolean {
     ],
     {
       cwd: orgRoot,
-      stdio: ["pipe", "inherit", "inherit"],
+      stdio: ["pipe", "pipe", "inherit"],
       input: buildPrompt(files),
     },
   );
+
+  const output = (result.stdout?.toString() ?? "").trimEnd();
+  if (output) {
+    const W = 60;
+    console.log(pc.dim("┌─ claude " + "─".repeat(W - 9) + "┐"));
+    for (const line of output.split("\n")) {
+      console.log(pc.dim("│ ") + line);
+    }
+    console.log(pc.dim("└" + "─".repeat(W) + "┘"));
+  }
+
   return result.status === 0;
 }
 
 // ── git helpers ───────────────────────────────────────────────────────────────
 
 function gitPull(orgRoot: string): void {
-  execFileSync("git", ["pull", "--ff-only"], { cwd: orgRoot, stdio: "inherit" });
+  const result = spawnSync("git", ["pull", "--ff-only"], {
+    cwd: orgRoot,
+    encoding: "utf8",
+  });
+  if (result.status !== 0) throw new Error(result.stderr ?? "git pull failed");
+  const out = result.stdout.trim();
+  console.log(pc.dim("↓ " + (out === "Already up to date." ? "already up to date" : out.split("\n")[0])));
 }
 
 function gitPush(orgRoot: string): void {
-  execFileSync("git", ["push"], { cwd: orgRoot, stdio: "inherit" });
+  execFileSync("git", ["push"], { cwd: orgRoot, stdio: "ignore" });
+  console.log(pc.dim("↑ pushed"));
 }
 
 // ── git commit ────────────────────────────────────────────────────────────────
@@ -199,8 +217,9 @@ function commitIngest(orgRoot: string, files: string[]): void {
       ? basename(files[0])
       : `${files.length} files`;
 
-  execFileSync("git", ["add", ...WIKI_FILES], { cwd: orgRoot });
-  execFileSync("git", ["commit", "-m", `[ingest] ${label}`], { cwd: orgRoot });
+  execFileSync("git", ["add", ...WIKI_FILES], { cwd: orgRoot, stdio: "pipe" });
+  execFileSync("git", ["commit", "-m", `[ingest] ${label}`], { cwd: orgRoot, stdio: "pipe" });
+  console.log(pc.dim(`  committed: [ingest] ${label}`));
 }
 
 // ── interactive selection ─────────────────────────────────────────────────────
