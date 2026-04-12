@@ -60,6 +60,7 @@ const ALLOWED_TOOLS = [
 function buildPrompt(files: string[]): string {
   const list = files.map((f, i) => `${i + 1}. ${f}`).join("\n");
   return (
+    `跳过 CLAUDE.md 会话开始检查清单。` +
     `按 CLAUDE.md § 3.1 消化工作流，依次消化以下 ${files.length} 个源文件，` +
     `每个文件执行完整的步骤 1-8 后再处理下一个，全部完成后统一更新 summary.org` +
     `（步骤 9 中的 3.0.1 仪表盘和 3.0.2 日志部分）。` +
@@ -70,7 +71,13 @@ function buildPrompt(files: string[]): string {
 function runClaude(orgRoot: string, files: string[]): boolean {
   const result = spawnSync(
     "claude",
-    ["-p", "--model", "sonnet", "--permission-mode", "dontAsk", "--allowedTools", ALLOWED_TOOLS],
+    [
+      "-p",
+      "--model", "sonnet",
+      "--permission-mode", "dontAsk",
+      "--allowedTools", ALLOWED_TOOLS,
+      "--append-system-prompt", "本次为自动化 ingest 任务，跳过会话开始检查清单，直接执行用户指令。",
+    ],
     {
       cwd: orgRoot,
       stdio: ["pipe", "inherit", "inherit"],
