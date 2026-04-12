@@ -227,7 +227,7 @@ function commitIngest(orgRoot: string, files: string[]): void {
 function formatChoice(f: PendingFile) {
   const badge = f.status === "new" ? pc.green("+") : pc.yellow("~");
   return {
-    name: `${badge} ${pc.bold(f.rel)}\n  ${pc.dim(f.status === "new" ? "new file" : "content changed")}`,
+    name: `${badge} ${pc.bold(f.rel)}\n  ${pc.dim(f.status === "new" ? "new" : "updated")}`,
     value: f.rel,
     short: f.rel,
   };
@@ -261,19 +261,19 @@ async function main(): Promise<void> {
     const pending = scanPendingFiles(orgRoot, lock);
 
     if (pending.length === 0) {
-      console.log(pc.green("✓") + " raw/ 下所有文件均已消化且内容未变");
+      console.log(pc.green("✓") + " all files up to date");
       return;
     }
 
     console.log(
-      pc.bold(`\n${pending.length} 个文件待消化`) +
+      pc.bold(`\n${pending.length} file(s) pending`) +
         pc.dim("  (org: " + orgRoot + ")\n"),
     );
 
     toIngest = await selectFiles(pending);
 
     if (toIngest.length === 0) {
-      console.log(pc.dim("已跳过"));
+      console.log(pc.dim("skipped"));
       return;
     }
   }
@@ -290,12 +290,12 @@ async function main(): Promise<void> {
     for (const file of toIngest) writeLockEntry(orgRoot, file, []);
     try {
       commitIngest(orgRoot, toIngest);
-      console.log(pc.green("✓") + " 完成");
+      console.log(pc.green("✓") + " done");
     } catch (e) {
-      console.warn(pc.yellow("⚠") + " git commit 失败:", (e as Error).message);
+      console.warn(pc.yellow("⚠") + " git commit failed:", (e as Error).message);
     }
   } else {
-    console.error(pc.red("✗") + " Claude 退出非零");
+    console.error(pc.red("✗") + " claude exited with non-zero status");
     process.exit(1);
   }
 
