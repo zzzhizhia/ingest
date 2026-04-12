@@ -332,7 +332,8 @@ async function main(): Promise<void> {
   console.log();
   console.log(
     "─".repeat(60) + "\n" +
-    toIngest.map((f, i) => pc.bold(`${i + 1}.`) + " " + f).join("\n") + "\n",
+    toIngest.map((f, i) => pc.bold(`${i + 1}.`) + " " + f).join("\n") +
+    "\n\n" + pc.dim("Ingesting..."),
   );
 
   const ok = runClaude(orgRoot, toIngest);
