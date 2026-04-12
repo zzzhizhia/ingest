@@ -76,7 +76,7 @@ function runClaude(orgRoot: string, file: string): boolean {
       ALLOWED_TOOLS,
       buildPrompt(file),
     ],
-    { cwd: orgRoot, stdio: "inherit" },
+    { cwd: orgRoot, stdio: ["ignore", "inherit", "inherit"] },
   );
   return result.status === 0;
 }
