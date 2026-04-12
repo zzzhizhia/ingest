@@ -1,5 +1,5 @@
 {
-  "name": "org-ingest",
+  "name": "ingest",
   "version": "1.0.0",
   "description": "Interactive CLI for ingesting raw files into an org-mode LLM wiki",
   "type": "module",
@@ -26,9 +26,9 @@
   "author": "zzzhizhi",
   "repository": {
     "type": "git",
-    "url": "https://github.com/zzzhizhia/org-ingest.git"
+    "url": "https://github.com/zzzhizhia/ingest.git"
   },
-  "homepage": "https://github.com/zzzhizhia/org-ingest",
+  "homepage": "https://github.com/zzzhizhia/ingest",
   "packageManager": "pnpm@10.33.0",
   "engines": {
     "node": ">=20"

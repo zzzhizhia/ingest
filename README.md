@@ -1,11 +1,11 @@
-# org-ingest
+# ingest
 
 Interactive CLI for ingesting raw source files into an org-mode LLM wiki via `claude -p`.
 
 ## Quick Start
 
 ```bash
-npx org-ingest
+npx ingest
 ```
 
 Run from your org directory (or any subdirectory). Detects the repo root by looking for `raw/` and `CLAUDE.md`.
@@ -14,10 +14,10 @@ Run from your org directory (or any subdirectory). Detects the repo root by look
 
 ```bash
 # Interactive: shows checkbox of new/updated files, select to ingest
-npx org-ingest
+npx ingest
 
 # Ingest a specific file directly (non-interactive)
-npx org-ingest raw/clips/sspai/article.org
+npx ingest raw/clips/sspai/article.org
 ```
 
 ## What it does
