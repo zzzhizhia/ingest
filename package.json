@@ -4,7 +4,7 @@
   "description": "Interactive CLI for ingesting raw files into an org-mode LLM wiki",
   "type": "module",
   "bin": {
-    "org-ingest": "./dist/index.mjs"
+    "ingest": "./dist/index.mjs"
   },
   "files": ["dist"],
   "scripts": {
