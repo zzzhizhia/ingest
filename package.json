@@ -26,9 +26,9 @@
   "author": "zzzhizhi",
   "repository": {
     "type": "git",
-    "url": "https://github.com/zzzhizhi/org-ingest.git"
+    "url": "https://github.com/zzzhizhia/org-ingest.git"
   },
-  "homepage": "https://github.com/zzzhizhi/org-ingest",
+  "homepage": "https://github.com/zzzhizhia/org-ingest",
   "packageManager": "pnpm@10.33.0",
   "engines": {
     "node": ">=20"
