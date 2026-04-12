@@ -81,6 +81,16 @@ function runClaude(orgRoot: string, file: string): boolean {
   return result.status === 0;
 }
 
+// ── git helpers ───────────────────────────────────────────────────────────────
+
+function gitPull(orgRoot: string): void {
+  execFileSync("git", ["pull", "--ff-only"], { cwd: orgRoot, stdio: "inherit" });
+}
+
+function gitPush(orgRoot: string): void {
+  execFileSync("git", ["push"], { cwd: orgRoot, stdio: "inherit" });
+}
+
 // ── git commit ────────────────────────────────────────────────────────────────
 
 const WIKI_FILES = [
@@ -134,6 +144,9 @@ async function selectFiles(pending: PendingFile[]): Promise<string[]> {
 
 async function main(): Promise<void> {
   const orgRoot = findOrgRoot(process.cwd());
+
+  gitPull(orgRoot);
+
   const explicitFiles = process.argv.slice(2);
 
   let toIngest: string[];
@@ -192,6 +205,8 @@ async function main(): Promise<void> {
     console.error(pc.red(`${failed} 个文件消化失败`));
     process.exit(1);
   }
+
+  gitPush(orgRoot);
 }
 
 // ── entry guard ───────────────────────────────────────────────────────────────
