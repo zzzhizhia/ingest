@@ -70,14 +70,12 @@ function buildPrompt(files: string[]): string {
 function runClaude(orgRoot: string, files: string[]): boolean {
   const result = spawnSync(
     "claude",
-    [
-      "-p",
-      "--model", "sonnet",
-      "--permission-mode", "dontAsk",
-      "--allowedTools", ALLOWED_TOOLS,
-      buildPrompt(files),
-    ],
-    { cwd: orgRoot, stdio: ["ignore", "inherit", "inherit"] },
+    ["-p", "--model", "sonnet", "--permission-mode", "dontAsk", "--allowedTools", ALLOWED_TOOLS],
+    {
+      cwd: orgRoot,
+      stdio: ["pipe", "inherit", "inherit"],
+      input: buildPrompt(files),
+    },
   );
   return result.status === 0;
 }
