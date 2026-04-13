@@ -187,6 +187,7 @@ function runClaude(orgRoot: string, files: string[]): boolean {
     [
       "-p",
       "--model", "sonnet",
+      "--effort", "medium",
       "--permission-mode", "dontAsk",
       "--allowedTools", ALLOWED_TOOLS,
       "--system-prompt", SYSTEM_PROMPT,
