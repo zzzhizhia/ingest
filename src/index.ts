@@ -251,8 +251,15 @@ const WIKI_FILES = [
 ];
 
 function commitIngest(orgRoot: string, files: string[]): void {
+  const label =
+    files.length === 1
+      ? basename(files[0])
+      : `${files.length} files`;
+
+  execFileSync("git", ["add", ...WIKI_FILES, ...files], { cwd: orgRoot, stdio: "pipe" });
+
   const hasChanges =
-    execFileSync("git", ["status", "--porcelain", ...WIKI_FILES], {
+    execFileSync("git", ["status", "--porcelain", ...WIKI_FILES, ...files], {
       cwd: orgRoot,
     })
       .toString()
@@ -260,12 +267,6 @@ function commitIngest(orgRoot: string, files: string[]): void {
 
   if (!hasChanges) return;
 
-  const label =
-    files.length === 1
-      ? basename(files[0])
-      : `${files.length} files`;
-
-  execFileSync("git", ["add", ...WIKI_FILES], { cwd: orgRoot, stdio: "pipe" });
   execFileSync("git", ["commit", "-m", `[ingest] ${label}`], { cwd: orgRoot, stdio: "pipe" });
   console.log(pc.dim(`  committed: [ingest] ${label}`));
 }
