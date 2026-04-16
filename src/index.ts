@@ -215,6 +215,7 @@ function runClaude(orgRoot: string, files: string[]): boolean {
 // ── git helpers ───────────────────────────────────────────────────────────────
 
 function gitPull(orgRoot: string): void {
+  process.stdout.write(pc.dim("↓ pulling..."));
   const stash = spawnSync("git", ["stash", "--include-untracked"], {
     cwd: orgRoot,
     encoding: "utf8",
@@ -231,7 +232,7 @@ function gitPull(orgRoot: string): void {
   if (result.status !== 0) throw new Error(result.stderr?.trim() ?? "git pull failed");
   const out = result.stdout.trim();
   const msg = out === "Already up to date." ? "already up to date" : out.split("\n")[0];
-  console.log(pc.dim("↓ " + msg + (didStash ? " (stashed/popped)" : "")));
+  process.stdout.write("\r" + pc.dim("↓ " + msg + (didStash ? " (stashed/popped)" : "")) + "\n");
 }
 
 function gitPush(orgRoot: string): void {
