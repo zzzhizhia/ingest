@@ -86,6 +86,22 @@ describe("extractReferencedFiles", () => {
     ]);
   });
 
+  it("resolves cross-directory references relative to source", () => {
+    make("raw/drafts/pkg/session.org", "[[../../clips/x.png]]\n");
+    make("raw/clips/x.png");
+    expect(
+      extractReferencedFiles(TMP, "raw/drafts/pkg/session.org"),
+    ).toEqual(["raw/clips/x.png"]);
+  });
+
+  it("resolves ./ prefix correctly", () => {
+    make("raw/drafts/pkg/session.org", "[[./sibling.png]]\n");
+    make("raw/drafts/pkg/sibling.png");
+    expect(
+      extractReferencedFiles(TMP, "raw/drafts/pkg/session.org"),
+    ).toEqual(["raw/drafts/pkg/sibling.png"]);
+  });
+
   it("does not include the source file itself", () => {
     make("raw/drafts/note.org", "self link [[./note.org]]\n");
     expect(extractReferencedFiles(TMP, "raw/drafts/note.org")).toEqual([]);
