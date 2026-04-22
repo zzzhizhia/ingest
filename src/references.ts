@@ -39,12 +39,10 @@ export function extractReferencedFiles(
       if (!target) continue;
 
       const abs = resolve(sourceDir, target);
-      const rel = relative(orgRoot, abs);
-      if (rel.startsWith("..") || rel === "") continue;
-      if (!existsSync(abs)) continue;
       if (abs === absSource) continue;
+      if (!existsSync(abs)) continue;
 
-      refs.add(rel);
+      refs.add(relative(orgRoot, abs));
     }
   }
 

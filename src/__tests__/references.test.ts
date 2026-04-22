@@ -59,9 +59,15 @@ describe("extractReferencedFiles", () => {
     expect(extractReferencedFiles(TMP, "raw/drafts/note.org")).toEqual([]);
   });
 
-  it("rejects paths that escape the repo", () => {
-    make("raw/drafts/note.org", "[[../../../etc/passwd]]\n");
-    expect(extractReferencedFiles(TMP, "raw/drafts/note.org")).toEqual([]);
+  it("includes paths that escape the repo when they exist", () => {
+    // orgRoot is TMP/root; source lives inside; target sits above orgRoot
+    make("root/raw/drafts/note.org", "[[../../../outside.txt]]\n");
+    make("outside.txt");
+    const result = extractReferencedFiles(
+      join(TMP, "root"),
+      "raw/drafts/note.org",
+    );
+    expect(result).toEqual(["../outside.txt"]);
   });
 
   it("strips org heading anchors (file.org::*heading)", () => {
