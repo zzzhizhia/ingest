@@ -228,12 +228,24 @@ function gitPull(orgRoot: string): void {
     encoding: "utf8",
   });
 
-  if (didStash) spawnSync("git", ["stash", "pop"], { cwd: orgRoot });
+  let popFailed = false;
+  if (didStash) {
+    const pop = spawnSync("git", ["stash", "pop"], {
+      cwd: orgRoot,
+      encoding: "utf8",
+    });
+    popFailed = pop.status !== 0;
+  }
 
   if (result.status !== 0) throw new Error(result.stderr?.trim() ?? "git pull failed");
   const out = result.stdout.trim();
   const msg = out === "Already up to date." ? "already up to date" : out.split("\n")[0];
-  process.stdout.write("\r" + pc.dim("↓ " + msg + (didStash ? " (stashed/popped)" : "")) + "\n");
+  const suffix = didStash
+    ? popFailed
+      ? pc.yellow(" (stash pop failed — run `git stash pop` manually)")
+      : " (stashed/popped)"
+    : "";
+  process.stdout.write("\r" + pc.dim("↓ " + msg) + suffix + "\n");
 }
 
 function gitPush(orgRoot: string): void {
