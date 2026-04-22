@@ -86,6 +86,14 @@ describe("extractReferencedFiles", () => {
     ]);
   });
 
+  it("resolves references into subdir of source", () => {
+    make("raw/drafts/note.org", "[[assets/pic.png]]\n");
+    make("raw/drafts/assets/pic.png");
+    expect(extractReferencedFiles(TMP, "raw/drafts/note.org")).toEqual([
+      "raw/drafts/assets/pic.png",
+    ]);
+  });
+
   it("resolves cross-directory references relative to source", () => {
     make("raw/drafts/pkg/session.org", "[[../../clips/x.png]]\n");
     make("raw/clips/x.png");
