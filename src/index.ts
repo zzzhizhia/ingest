@@ -322,12 +322,39 @@ async function selectFiles(pending: PendingFile[]): Promise<string[]> {
 
 // ── main ──────────────────────────────────────────────────────────────────────
 
+const HELP = `\
+${pc.bold("ingest")}  Interactive ingest for an org-mode LLM wiki via ${pc.cyan("claude -p")}.
+
+${pc.bold("Usage")}
+  ingest                     interactive checkbox of pending files
+  ingest --all               ingest every pending file, no prompt
+  ingest <path> [path ...]   ingest specific files directly
+
+${pc.bold("Options")}
+  -a, --all       ingest all pending files without prompting
+  -h, --help      show this help and exit
+
+${pc.bold("Flow")}
+  git pull --ff-only (auto stash/pop)
+  scan raw/ vs .ingest-lock.json → NEW + UPDATED files
+  claude -p --model sonnet (single session for all selected files)
+  write .ingest-lock.json + git commit + git push
+
+Org root is detected by walking up for a dir containing ${pc.cyan("raw/")} and ${pc.cyan("CLAUDE.md")}.
+`;
+
 async function main(): Promise<void> {
+  const args = process.argv.slice(2);
+
+  if (args.includes("--help") || args.includes("-h")) {
+    process.stdout.write(HELP);
+    return;
+  }
+
   const orgRoot = findOrgRoot(process.cwd());
 
   gitPull(orgRoot);
 
-  const args = process.argv.slice(2);
   const allFlag = args.includes("--all") || args.includes("-a");
   const explicitFiles = args.filter((a) => !a.startsWith("-"));
 
