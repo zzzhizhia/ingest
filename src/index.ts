@@ -2,10 +2,11 @@ import { checkbox } from "@inquirer/prompts";
 import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { realpathSync } from "node:fs";
-import { basename, dirname, join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import pc from "picocolors";
 import { readLock, writeLockEntry } from "./lock.js";
+import { extractReferencedFiles } from "./references.js";
 import { scanPendingFiles, type PendingFile } from "./scanner.js";
 
 // ── withQuit ──────────────────────────────────────────────────────────────────
@@ -251,17 +252,13 @@ const WIKI_FILES = [
   ".ingest-lock.json",
 ];
 
-// Denote packaging dir: {YYYYMMDDTHHMMSS}--{title}__{tags}/
-// When a source file sits inside such a dir, the whole dir (sibling attachments
-// like images) should be committed alongside the source.
-const DENOTE_DIR = /^\d{8}T\d{6}--.*__.*$/;
-
-function sourcePathsToAdd(files: string[]): string[] {
+function sourcePathsToAdd(orgRoot: string, files: string[]): string[] {
   const paths = new Set<string>();
   for (const file of files) {
     paths.add(file);
-    const parent = dirname(file);
-    if (DENOTE_DIR.test(basename(parent))) paths.add(parent);
+    for (const ref of extractReferencedFiles(orgRoot, file)) {
+      paths.add(ref);
+    }
   }
   return [...paths];
 }
@@ -272,7 +269,7 @@ function commitIngest(orgRoot: string, files: string[]): void {
       ? basename(files[0])
       : `${files.length} files`;
 
-  const sources = sourcePathsToAdd(files);
+  const sources = sourcePathsToAdd(orgRoot, files);
   const allPaths = [...WIKI_FILES, ...sources];
 
   execFileSync("git", ["add", ...allPaths], { cwd: orgRoot, stdio: "pipe" });

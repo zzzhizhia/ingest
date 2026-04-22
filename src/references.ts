@@ -1,0 +1,52 @@
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, join, relative, resolve } from "node:path";
+
+// Skip any link whose target starts with these schemes.
+const EXTERNAL_SCHEME = /^(https?|ftp|mailto|id|file\+sys|doi|tel|news):/i;
+
+// org-mode links:   [[target]]  [[target][desc]]  [[file:target][desc]]
+const ORG_LINK = /\[\[(?:file:)?([^\]\[]+?)(?:\]\[[^\]]*)?\]\]/g;
+
+// markdown links & images:  [text](target)  ![alt](target)
+const MD_LINK = /!?\[[^\]]*\]\(([^)\s]+)\)/g;
+
+/**
+ * Parse a source file for references to other local files.
+ * Returns repo-relative paths of existing sibling/descendant files only.
+ * External URLs, org-id links, anchors, and out-of-repo paths are excluded.
+ */
+export function extractReferencedFiles(
+  orgRoot: string,
+  sourceRel: string,
+): string[] {
+  const absSource = join(orgRoot, sourceRel);
+  const content = readFileSync(absSource, "utf8");
+  const sourceDir = dirname(absSource);
+
+  const refs = new Set<string>();
+
+  for (const re of [ORG_LINK, MD_LINK]) {
+    re.lastIndex = 0;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(content)) !== null) {
+      let target = m[1].trim();
+      if (!target) continue;
+      if (EXTERNAL_SCHEME.test(target)) continue;
+      if (target.startsWith("#")) continue;
+
+      // strip anchor fragment, e.g. "file.org::*heading"
+      target = target.split(/::/)[0];
+      if (!target) continue;
+
+      const abs = resolve(sourceDir, target);
+      const rel = relative(orgRoot, abs);
+      if (rel.startsWith("..") || rel === "") continue;
+      if (!existsSync(abs)) continue;
+      if (abs === absSource) continue;
+
+      refs.add(rel);
+    }
+  }
+
+  return [...refs].sort();
+}
