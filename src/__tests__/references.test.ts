@@ -114,4 +114,10 @@ describe("extractReferencedFiles", () => {
     make("raw/drafts/note.org", "self link [[./note.org]]\n");
     expect(extractReferencedFiles(TMP, "raw/drafts/note.org")).toEqual([]);
   });
+
+  it("returns empty for PDF without reading binary content", () => {
+    // Binary content would throw if read as utf8 and parsed
+    make("raw/clips/doc.pdf", "%PDF-1.4\n%\x00\x01\x02 binary");
+    expect(extractReferencedFiles(TMP, "raw/clips/doc.pdf")).toEqual([]);
+  });
 });

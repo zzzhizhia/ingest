@@ -129,7 +129,7 @@ const SYSTEM_PROMPT = `\
 
 ## 消化步骤（每个源文件依次执行）
 
-1. **读取源文件**：用 Read 工具读取。文件 > 200KB 分段读取（先读前 50KB，再读下一个 50KB，依此类推）。
+1. **读取源文件**：用 Read 工具读取。文件 > 200KB 分段读取（先读前 50KB，再读下一个 50KB，依此类推）。PDF 文件用 Read 工具的 \`pages\` 参数按页读取（超过 10 页必须指定页范围）。
 2. **验证**：文件不存在或为空则跳过并报告。
 3. **检查重复**：
    \`grep -l "SOURCES:.*{path}" entities.org concepts.org sources.org analyses.org\`

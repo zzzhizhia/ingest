@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
-import { dirname, join, relative, resolve } from "node:path";
+import { dirname, extname, join, relative, resolve } from "node:path";
 
 // Skip any link whose target starts with these schemes.
 const EXTERNAL_SCHEME = /^(https?|ftp|mailto|id|file\+sys|doi|tel|news):/i;
@@ -10,15 +10,21 @@ const ORG_LINK = /\[\[(?:file:)?([^\]\[]+?)(?:\]\[[^\]]*)?\]\]/g;
 // markdown links & images:  [text](target)  ![alt](target)
 const MD_LINK = /!?\[[^\]]*\]\(([^)\s]+)\)/g;
 
+// Binary formats: can't parse as text. No references to extract.
+const BINARY_EXT = new Set([".pdf"]);
+
 /**
  * Parse a source file for references to other local files.
  * Returns repo-relative paths of existing sibling/descendant files only.
- * External URLs, org-id links, anchors, and out-of-repo paths are excluded.
+ * External URLs, org-id links, anchors are excluded.
+ * Binary formats (e.g. PDF) return empty — they can't reference other files.
  */
 export function extractReferencedFiles(
   orgRoot: string,
   sourceRel: string,
 ): string[] {
+  if (BINARY_EXT.has(extname(sourceRel).toLowerCase())) return [];
+
   const absSource = join(orgRoot, sourceRel);
   const content = readFileSync(absSource, "utf8");
   const sourceDir = dirname(absSource);
