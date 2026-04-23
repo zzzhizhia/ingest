@@ -63,8 +63,14 @@ describe("scanPendingFiles", () => {
 
   it("ignores unsupported file extensions", () => {
     makeOrg(TMP, "raw/clips/image.png", "binary");
-    makeOrg(TMP, "raw/clips/doc.pdf", "pdf");
+    makeOrg(TMP, "raw/clips/archive.zip", "binary");
     expect(scanPendingFiles(TMP, emptyLock())).toHaveLength(0);
+  });
+
+  it("includes .pdf files", () => {
+    makeOrg(TMP, "raw/papers/paper.pdf", "%PDF-1.4 binary");
+    const results = scanPendingFiles(TMP, emptyLock());
+    expect(results).toEqual([{ rel: "raw/papers/paper.pdf", status: "new" }]);
   });
 
   it("handles multiple files mixed new/updated/done", () => {
