@@ -270,6 +270,8 @@ function sourcePathsToAdd(orgRoot: string, files: string[]): string[] {
   for (const file of files) {
     paths.add(file);
     for (const ref of extractReferencedFiles(orgRoot, file)) {
+      // git add refuses paths outside the repo; drop them silently.
+      if (ref.startsWith("..")) continue;
       paths.add(ref);
     }
   }
