@@ -223,6 +223,20 @@ function gitPull(orgRoot: string): void {
   });
   const didStash = stash.status === 0 && !stash.stdout.includes("No local changes");
 
+  // If interrupted (Ctrl+C) between stash and pop, the user's local changes
+  // would be stuck in stash. Catch SIGINT/SIGTERM, pop, then exit.
+  const onInterrupt = () => {
+    process.stdout.write(
+      "\n" + pc.yellow("⚠ interrupted — restoring stashed changes...") + "\n",
+    );
+    spawnSync("git", ["stash", "pop"], { cwd: orgRoot, stdio: "inherit" });
+    process.exit(130);
+  };
+  if (didStash) {
+    process.on("SIGINT", onInterrupt);
+    process.on("SIGTERM", onInterrupt);
+  }
+
   const result = spawnSync("git", ["pull", "--ff-only"], {
     cwd: orgRoot,
     encoding: "utf8",
@@ -233,6 +247,8 @@ function gitPull(orgRoot: string): void {
       cwd: orgRoot,
       encoding: "utf8",
     });
+    process.off("SIGINT", onInterrupt);
+    process.off("SIGTERM", onInterrupt);
     if (pop.status !== 0) {
       throw new Error(
         "stash pop failed after pull (likely conflict). " +
