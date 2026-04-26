@@ -127,28 +127,43 @@ const SYSTEM_PROMPT = `\
 - **按需**创建 :concept: 页面 — 仅限有清晰定义或框架结构的概念。一句话能说清的观点不单独建页。
 - 不要为琐碎的实体（一次性提及的人名/地名）建页。
 
-## 消化步骤（每个源文件依次执行）
+## 用户输入格式
 
-1. **读取源文件**：用 Read 工具读取。文件 > 200KB 分段读取（先读前 50KB，再读下一个 50KB，依此类推）。
+每个文件会带 \`[NEW]\` 或 \`[UPDATED]\` 标签，对应两条独立工作流：
+
+- **[NEW]** = 此源文件从未消化过（不在 \`.ingest-lock.json\`）。
+- **[UPDATED]** = 此源文件之前消化过、内容已变更（lock 中哈希不匹配）。
+
+## 工作流 A：新消化（[NEW] 文件）
+
+1. **读取源文件**：用 Read 工具读取。文件 > 200KB 分段读取。
 2. **验证**：文件不存在或为空则跳过并报告。
-3. **检查重复**：
-   \`grep -l "SOURCES:.*{path}" entities.org concepts.org sources.org analyses.org\`
-   — 找到则为 re-ingest：读取已有 heading 内容 + 新源材料，准备合并更新。
-   — 未找到则为新消化。
-4. **提取关键信息**：识别实体、概念、关键论点和论据。记录每个论点所在章节（用于来源标注）。
-5. **匹配已有 heading**：
+3. **提取关键信息**：识别实体、概念、关键论点和论据。记录每个论点所在章节。
+4. **匹配已有 heading**（其他源可能已建过同名实体/概念）：
    \`grep -n "^\\* .*{name}" entities.org concepts.org sources.org analyses.org\`
    使用模糊匹配："Richard Stallman" 应匹配 "Stallman" 或 "RMS"。
-   — 匹配到：准备更新已有 heading。
-   — 未匹配：准备在对应文件末尾追加新 heading。
-6. **写入页面**：
-   - 新页面：按模板写入完整内容，生成新 ID，追加到对应分类文件末尾。
-   - 更新页面（re-ingest）：合并新信息到已有内容中，保留旧的交叉引用，在变更处标注来源。
-   - 每条论点附来源标注和置信度。
-   - 添加双向交叉引用。
-7. **检查矛盾**：
-   将新论点与已有 wiki 内容比较。如发现矛盾：
-   - 在两个 heading 的矛盾章节都添加 :CONTRADICTS: 属性和解释。
+   — 匹配到：把本源的新信息追加到已有页面的 \`** 内容\` 章节，附 [source: ...] 标注。
+   — 未匹配：在对应文件末尾追加新 heading（按模板）。
+5. **写入 source 页**（必须）：在 sources.org 末尾追加该源摘要页，:SOURCES: 指向源文件路径。
+6. **添加双向交叉引用**。
+7. **检查矛盾**：与已有 wiki 内容比对，如发现矛盾，在两个 heading 的矛盾章节都加 :CONTRADICTS:。
+
+## 工作流 B：再消化（[UPDATED] 文件）
+
+源文件内容已变更，wiki 中已有页面引用此源。**目标是 diff 出新增/修改的内容并合并进 wiki**，不是重新写一遍。
+
+1. **读取新源文件**：用 Read 工具读取最新版本。
+2. **找到所有引用此源的 wiki 页面**：
+   \`grep -l "SOURCES:.*{path}" entities.org concepts.org sources.org analyses.org\`
+   读取每个匹配页面的完整内容。
+3. **diff 新旧内容**：把新源内容和已有 wiki 页面对比：
+   - **新增的论点**：源里有、wiki 没有 → 新增到对应页面，附 [source: ... | HIGH]，可加 \`[update YYYY-MM-DD]\` 时间标注。
+   - **修改的论点**：源里改写了已有论点 → 在 wiki 的对应位置追加修订说明（不删旧的，按"绝不删除"规则保留）。
+   - **删除的论点**：源里去掉了某些信息 → 给 wiki 中对应论点加 \`[outdated YYYY-MM-DD]\` 标记，不删除。
+4. **更新 sources.org 中此源的 :source: 页**：刷新概述（如材料结构变化大），在内容章节追加变更总结。
+5. **保留旧的交叉引用**：不要因为这次更新而移除已有的 \`** 交叉引用\` 链接。
+6. **如出现新实体/概念**：按工作流 A 步骤 4 处理（匹配或新建）。
+7. **检查矛盾**：新版本可能解决或引入矛盾，相应更新 :CONTRADICTS:。
 
 ## 完成所有文件后
 
@@ -174,15 +189,21 @@ const SYSTEM_PROMPT = `\
 - 不修改 summary.org 的仪表盘 babel 块
 `;
 
-function buildPrompt(files: string[]): string {
-  const list = files.map((f, i) => `${i + 1}. ${f}`).join("\n");
+function buildPrompt(files: PendingFile[]): string {
+  const list = files
+    .map((f, i) => {
+      const tag = f.status === "new" ? "[NEW]" : "[UPDATED]";
+      return `${i + 1}. ${tag} ${f.rel}`;
+    })
+    .join("\n");
   return (
-    `依次消化以下 ${files.length} 个源文件，每个文件完整执行消化步骤后再处理下一个，` +
-    `全部完成后统一更新 summary.org。\n\n${list}`
+    `依次消化以下 ${files.length} 个源文件，每个文件完整执行对应工作流后再处理下一个，` +
+    `全部完成后统一更新 summary.org。\n\n` +
+    `[NEW] 走"新消化"工作流；[UPDATED] 走"再消化"工作流——见 system prompt 中两条独立路径。\n\n${list}`
   );
 }
 
-function runClaude(orgRoot: string, files: string[]): boolean {
+function runClaude(orgRoot: string, files: PendingFile[]): boolean {
   const result = spawnSync(
     "claude",
     [
@@ -324,12 +345,12 @@ function formatChoice(f: PendingFile) {
   const badge = f.status === "new" ? pc.green("+") : pc.yellow("~");
   return {
     name: `${badge} ${pc.bold(f.rel)}\n  ${pc.dim(f.status === "new" ? "new" : "updated")}`,
-    value: f.rel,
+    value: f,
     short: f.rel,
   };
 }
 
-async function selectFiles(pending: PendingFile[]): Promise<string[]> {
+async function selectFiles(pending: PendingFile[]): Promise<PendingFile[]> {
   return withQuit(checkbox, {
     message: `Select files to ingest  ${pc.dim("(space: toggle, a: all, enter: confirm, q: quit)")}`,
     choices: pending.map(formatChoice),
@@ -376,12 +397,16 @@ async function main(): Promise<void> {
   const allFlag = args.includes("--all") || args.includes("-a");
   const explicitFiles = args.filter((a) => !a.startsWith("-"));
 
-  let toIngest: string[];
+  const lock = readLock(orgRoot);
+  let toIngest: PendingFile[];
 
   if (explicitFiles.length > 0) {
-    toIngest = explicitFiles;
+    // Explicit paths: derive status from lock (in lock → updated, else → new).
+    toIngest = explicitFiles.map((rel) => ({
+      rel,
+      status: lock.files[rel] ? "updated" : "new",
+    }));
   } else {
-    const lock = readLock(orgRoot);
     const pending = scanPendingFiles(orgRoot, lock);
 
     if (pending.length === 0) {
@@ -395,7 +420,7 @@ async function main(): Promise<void> {
     );
 
     if (allFlag) {
-      toIngest = pending.map((f) => f.rel);
+      toIngest = pending;
     } else {
       toIngest = await selectFiles(pending);
       if (toIngest.length === 0) {
@@ -408,16 +433,21 @@ async function main(): Promise<void> {
   console.log();
   console.log(
     "─".repeat(60) + "\n" +
-    toIngest.map((f, i) => pc.bold(`${i + 1}.`) + " " + f).join("\n") +
+    toIngest
+      .map((f, i) => {
+        const tag = f.status === "new" ? pc.green("[NEW]") : pc.yellow("[UPDATED]");
+        return pc.bold(`${i + 1}.`) + " " + tag + " " + f.rel;
+      })
+      .join("\n") +
     "\n\n" + pc.dim("Ingesting..."),
   );
 
   const ok = runClaude(orgRoot, toIngest);
 
   if (ok) {
-    for (const file of toIngest) writeLockEntry(orgRoot, file, []);
+    for (const f of toIngest) writeLockEntry(orgRoot, f.rel, []);
     try {
-      commitIngest(orgRoot, toIngest);
+      commitIngest(orgRoot, toIngest.map((f) => f.rel));
       console.log(pc.green("✓") + " done");
     } catch (e) {
       console.warn(pc.yellow("⚠") + " git commit failed:", (e as Error).message);
