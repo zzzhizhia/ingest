@@ -224,9 +224,12 @@ async function runClaude(orgRoot: string, files: PendingFile[]): Promise<boolean
       output += chunk.toString();
     });
 
-    // SIGINT/SIGTERM during claude run: forward to child, then escalate.
-    // spawnSync would have blocked the event loop here; spawn lets handlers fire.
+    // Track whether the user interrupted, regardless of how claude exits.
+    // claude may handle SIGINT internally and exit cleanly (code 0), so
+    // checking the close `signal` is not sufficient.
+    let interrupted = false;
     const onInterrupt = () => {
+      interrupted = true;
       process.stdout.write(
         "\n" + pc.yellow("⚠ interrupting claude...") + "\n",
       );
@@ -238,7 +241,7 @@ async function runClaude(orgRoot: string, files: PendingFile[]): Promise<boolean
     process.on("SIGINT", onInterrupt);
     process.on("SIGTERM", onInterrupt);
 
-    child.on("close", (code, signal) => {
+    child.on("close", (code) => {
       process.off("SIGINT", onInterrupt);
       process.off("SIGTERM", onInterrupt);
 
@@ -252,7 +255,8 @@ async function runClaude(orgRoot: string, files: PendingFile[]): Promise<boolean
         console.log(pc.dim("└" + "─".repeat(W) + "┘"));
       }
 
-      if (signal === "SIGINT" || signal === "SIGTERM" || signal === "SIGKILL") {
+      if (interrupted) {
+        console.error(pc.red("✗") + " aborted by user");
         process.exit(130);
       }
 
