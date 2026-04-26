@@ -1,5 +1,5 @@
 import { checkbox } from "@inquirer/prompts";
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { realpathSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
@@ -202,35 +202,70 @@ function buildPrompt(files: PendingFile[]): string {
   );
 }
 
-function runClaude(orgRoot: string, files: PendingFile[]): boolean {
-  const result = spawnSync(
-    "claude",
-    [
-      "-p",
-      "--model", "sonnet",
-      "--effort", "medium",
-      "--permission-mode", "dontAsk",
-      "--allowedTools", ALLOWED_TOOLS,
-      "--system-prompt", SYSTEM_PROMPT,
-    ],
-    {
-      cwd: orgRoot,
-      stdio: ["pipe", "pipe", "inherit"],
-      input: buildPrompt(files),
-    },
-  );
+async function runClaude(orgRoot: string, files: PendingFile[]): Promise<boolean> {
+  return new Promise((resolve) => {
+    const child = spawn(
+      "claude",
+      [
+        "-p",
+        "--model", "sonnet",
+        "--effort", "medium",
+        "--permission-mode", "dontAsk",
+        "--allowedTools", ALLOWED_TOOLS,
+        "--system-prompt", SYSTEM_PROMPT,
+      ],
+      { cwd: orgRoot, stdio: ["pipe", "pipe", "inherit"] },
+    );
 
-  const output = (result.stdout?.toString() ?? "").trimEnd();
-  if (output) {
-    const W = 60;
-    console.log(pc.dim("┌─ claude " + "─".repeat(W - 9) + "┐"));
-    for (const line of output.split("\n")) {
-      console.log(pc.dim("│ ") + line);
-    }
-    console.log(pc.dim("└" + "─".repeat(W) + "┘"));
-  }
+    child.stdin?.end(buildPrompt(files));
 
-  return result.status === 0;
+    let output = "";
+    child.stdout?.on("data", (chunk: Buffer) => {
+      output += chunk.toString();
+    });
+
+    // SIGINT/SIGTERM during claude run: forward to child, then escalate.
+    // spawnSync would have blocked the event loop here; spawn lets handlers fire.
+    const onInterrupt = () => {
+      process.stdout.write(
+        "\n" + pc.yellow("⚠ interrupting claude...") + "\n",
+      );
+      child.kill("SIGINT");
+      setTimeout(() => {
+        if (!child.killed) child.kill("SIGKILL");
+      }, 3000).unref();
+    };
+    process.on("SIGINT", onInterrupt);
+    process.on("SIGTERM", onInterrupt);
+
+    child.on("close", (code, signal) => {
+      process.off("SIGINT", onInterrupt);
+      process.off("SIGTERM", onInterrupt);
+
+      const trimmed = output.trimEnd();
+      if (trimmed) {
+        const W = 60;
+        console.log(pc.dim("┌─ claude " + "─".repeat(W - 9) + "┐"));
+        for (const line of trimmed.split("\n")) {
+          console.log(pc.dim("│ ") + line);
+        }
+        console.log(pc.dim("└" + "─".repeat(W) + "┘"));
+      }
+
+      if (signal === "SIGINT" || signal === "SIGTERM" || signal === "SIGKILL") {
+        process.exit(130);
+      }
+
+      resolve(code === 0);
+    });
+
+    child.on("error", (err) => {
+      process.off("SIGINT", onInterrupt);
+      process.off("SIGTERM", onInterrupt);
+      console.error(err.message);
+      resolve(false);
+    });
+  });
 }
 
 // ── git helpers ───────────────────────────────────────────────────────────────
@@ -441,7 +476,7 @@ async function main(): Promise<void> {
     "\n\n" + pc.dim("Ingesting..."),
   );
 
-  const ok = runClaude(orgRoot, toIngest);
+  const ok = await runClaude(orgRoot, toIngest);
 
   if (ok) {
     for (const f of toIngest) writeLockEntry(orgRoot, f.rel, []);
