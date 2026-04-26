@@ -184,7 +184,6 @@ const SYSTEM_PROMPT = `\
 ## 禁止事项
 
 - 不执行 git commit
-- 不运行 update-lock.js 或任何 lock 相关操作
 - 不读取或依赖 CLAUDE.md
 - 不修改 summary.org 的仪表盘 babel 块
 `;
