@@ -184,6 +184,7 @@ const SYSTEM_PROMPT = `\
 ## 禁止事项
 
 - 不执行 git commit
+- 不运行 update-lock.js 或任何 lock 相关操作
 - 不读取或依赖 CLAUDE.md
 - 不修改 summary.org 的仪表盘 babel 块
 `;
@@ -197,8 +198,7 @@ function buildPrompt(files: PendingFile[]): string {
     .join("\n");
   return (
     `依次消化以下 ${files.length} 个源文件，每个文件完整执行对应工作流后再处理下一个，` +
-    `全部完成后统一更新 summary.org。\n\n` +
-    `[NEW] 走"新消化"工作流；[UPDATED] 走"再消化"工作流——见 system prompt 中两条独立路径。\n\n${list}`
+    `全部完成后统一更新 summary.org。\n\n${list}`
   );
 }
 
