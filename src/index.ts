@@ -6,6 +6,7 @@ import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import pc from "picocolors";
 import { runSafeFixes, type AppliedFix } from "./fix.js";
+import { installPreCommitHook } from "./init.js";
 import { readLock, writeLockEntry } from "./lock.js";
 import { extractReferencedFiles } from "./references.js";
 import { scanPendingFiles, type PendingFile } from "./scanner.js";
@@ -501,6 +502,7 @@ ${pc.bold("Usage")}
   ingest                     interactive checkbox of pending files
   ingest --all               ingest every pending file, no prompt
   ingest <path> [path ...]   ingest specific files directly
+  ingest init                install/refresh .git/hooks/pre-commit
   ingest --fix               apply safe auto-fixes to wiki files (no ingest)
 
 ${pc.bold("Options")}
@@ -535,6 +537,31 @@ async function main(): Promise<void> {
   }
 
   const orgRoot = findOrgRoot(process.cwd());
+
+  const positional = args.filter((a) => !a.startsWith("-"));
+  if (positional[0] === "init") {
+    const result = installPreCommitHook(orgRoot);
+    switch (result.action) {
+      case "wrote":
+        console.log(pc.green("✓") + " installed " + pc.cyan(result.path));
+        break;
+      case "skipped":
+        console.log(pc.green("✓") + " " + pc.cyan(result.path) + " already up to date");
+        break;
+      case "replaced-symlink":
+        console.log(
+          pc.green("✓") + " replaced symlink with regular file at " + pc.cyan(result.path),
+        );
+        break;
+      case "replaced-and-backed-up":
+        console.log(
+          pc.green("✓") + " installed " + pc.cyan(result.path) +
+            pc.dim(`  (previous content backed up to ${result.backupPath})`),
+        );
+        break;
+    }
+    return;
+  }
 
   if (args.includes("--fix")) {
     const result = runSafeFixes(orgRoot);
