@@ -5,6 +5,7 @@ import { realpathSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import pc from "picocolors";
+import { runSafeFixes, type AppliedFix } from "./fix.js";
 import { readLock, writeLockEntry } from "./lock.js";
 import { extractReferencedFiles } from "./references.js";
 import { scanPendingFiles, type PendingFile } from "./scanner.js";
@@ -202,7 +203,14 @@ function buildPrompt(files: PendingFile[]): string {
   );
 }
 
-async function runClaude(orgRoot: string, files: PendingFile[]): Promise<boolean> {
+type ClaudeRunOpts = {
+  orgRoot: string;
+  systemPrompt: string;
+  prompt: string;
+  label: string;
+};
+
+async function invokeClaude(opts: ClaudeRunOpts): Promise<boolean> {
   return new Promise((resolve) => {
     const child = spawn(
       "claude",
@@ -212,12 +220,12 @@ async function runClaude(orgRoot: string, files: PendingFile[]): Promise<boolean
         "--effort", "medium",
         "--permission-mode", "dontAsk",
         "--allowedTools", ALLOWED_TOOLS,
-        "--system-prompt", SYSTEM_PROMPT,
+        "--system-prompt", opts.systemPrompt,
       ],
-      { cwd: orgRoot, stdio: ["pipe", "pipe", "inherit"] },
+      { cwd: opts.orgRoot, stdio: ["pipe", "pipe", "inherit"] },
     );
 
-    child.stdin?.end(buildPrompt(files));
+    child.stdin?.end(opts.prompt);
 
     let output = "";
     child.stdout?.on("data", (chunk: Buffer) => {
@@ -248,7 +256,9 @@ async function runClaude(orgRoot: string, files: PendingFile[]): Promise<boolean
       const trimmed = output.trimEnd();
       if (trimmed) {
         const W = 60;
-        console.log(pc.dim("┌─ claude " + "─".repeat(W - 9) + "┐"));
+        const header = `┌─ ${opts.label} `;
+        const padding = Math.max(0, W - header.length + 1);
+        console.log(pc.dim(header + "─".repeat(padding) + "┐"));
         for (const line of trimmed.split("\n")) {
           console.log(pc.dim("│ ") + line);
         }
@@ -269,6 +279,80 @@ async function runClaude(orgRoot: string, files: PendingFile[]): Promise<boolean
       console.error(err.message);
       resolve(false);
     });
+  });
+}
+
+async function runClaude(orgRoot: string, files: PendingFile[]): Promise<boolean> {
+  return invokeClaude({
+    orgRoot,
+    systemPrompt: SYSTEM_PROMPT,
+    prompt: buildPrompt(files),
+    label: "claude",
+  });
+}
+
+// ── claude fix invocation ─────────────────────────────────────────────────────
+
+const FIX_SYSTEM_PROMPT = `\
+你是 org-mode wiki 的 pre-commit 修复引擎。一次 [ingest] commit 刚被 pre-commit hook 拒绝，
+你的唯一任务是修复 hook 报出的所有问题，让外层重试 commit 时通过。
+
+## 常见错误与修复策略
+
+1. **broken link** (\`LINK: broken id:XXXX in <file> (no heading with :ID: XXXX)\`)
+   - 原因：交叉引用使用了占位/行号/猜测的 ID，目标 heading 实际没有这个 :ID:。
+   - 修复：从链接的显示文本（如 \`[[id:XXXX][元学习者]]\` 中的"元学习者"）出发，
+     用 grep 在 entities.org / concepts.org / sources.org / analyses.org 中查找
+     真正的 :ID:，再用 Edit 把 \`id:XXXX\` 替换为正确 ID。
+   - 若确实找不到对应 heading：删除该交叉引用整行（合法，因为目标不存在）。
+
+2. **missing :ID: / :DATE: / 缺少标签**：heading 不符合页面模板。
+   - 修复：补全缺失字段。:ID: 用 \`date +%Y%m%dT%H%M%S\` 生成，:DATE: 用 \`[YYYY-MM-DD]\`。
+
+3. **invalid tag**：heading 标签与所在文件不匹配。
+   - 修复：entities.org → :entity:，concepts.org → :concept:，
+     sources.org → :source:，analyses.org → :analysis:。
+
+## 工作流
+
+1. 阅读 hook 错误输出，逐项识别问题。
+2. 用 Bash(grep) / Read 定位每个出错位置。
+3. 用 Edit 工具最小化修复，只改触发错误的行。
+4. 不新增 wiki heading；不修改无关行；不执行 git add / git commit（外层会重试 commit）。
+
+## 安全规则
+
+1. 绝不删除已有 wiki heading（只能删除断开的交叉引用条目）。
+2. 绝不修改 raw/ 下的源文件。
+3. 修改最小化：只动 hook 错误指向的具体位置。
+`;
+
+function buildFixPrompt(errorOutput: string, files: PendingFile[]): string {
+  const list = files
+    .map((f, i) => {
+      const tag = f.status === "new" ? "[NEW]" : "[UPDATED]";
+      return `${i + 1}. ${tag} ${f.rel}`;
+    })
+    .join("\n");
+  return (
+    `本次 [ingest] 涉及以下源文件（wiki 已写入，但 commit 被 pre-commit hook 拒绝）：\n\n` +
+    `${list}\n\n` +
+    `pre-commit hook 输出：\n\n` +
+    "```\n" + errorOutput + "\n```\n\n" +
+    `请修复以上所有错误后退出。不要执行 git add / git commit，外层会自动重试 commit。`
+  );
+}
+
+async function runClaudeFix(
+  orgRoot: string,
+  errorOutput: string,
+  files: PendingFile[],
+): Promise<boolean> {
+  return invokeClaude({
+    orgRoot,
+    systemPrompt: FIX_SYSTEM_PROMPT,
+    prompt: buildFixPrompt(errorOutput, files),
+    label: "claude (fix)",
   });
 }
 
@@ -353,7 +437,9 @@ function sourcePathsToAdd(orgRoot: string, files: string[]): string[] {
   return [...paths];
 }
 
-function commitIngest(orgRoot: string, files: string[]): void {
+type CommitResult = { ok: true } | { ok: false; error: string };
+
+function commitIngest(orgRoot: string, files: string[]): CommitResult {
   const label =
     files.length === 1
       ? basename(files[0])
@@ -371,10 +457,19 @@ function commitIngest(orgRoot: string, files: string[]): void {
       .toString()
       .trim().length > 0;
 
-  if (!hasChanges) return;
+  if (!hasChanges) return { ok: true };
 
-  execFileSync("git", ["commit", "-m", `[ingest] ${label}`], { cwd: orgRoot, stdio: "pipe" });
+  const result = spawnSync("git", ["commit", "-m", `[ingest] ${label}`], {
+    cwd: orgRoot,
+    encoding: "utf8",
+  });
+
+  if (result.status !== 0) {
+    const error = ((result.stdout ?? "") + (result.stderr ?? "")).trim();
+    return { ok: false, error };
+  }
   console.log(pc.dim(`  committed: [ingest] ${label}`));
+  return { ok: true };
 }
 
 // ── interactive selection ─────────────────────────────────────────────────────
@@ -406,19 +501,30 @@ ${pc.bold("Usage")}
   ingest                     interactive checkbox of pending files
   ingest --all               ingest every pending file, no prompt
   ingest <path> [path ...]   ingest specific files directly
+  ingest --fix               apply safe auto-fixes to wiki files (no ingest)
 
 ${pc.bold("Options")}
   -a, --all       ingest all pending files without prompting
+      --fix       apply deterministic safe fixes (tag-file mismatch,
+                  broken-link with unique title match) and exit
   -h, --help      show this help and exit
 
 ${pc.bold("Flow")}
   git pull --ff-only (auto stash/pop)
   scan raw/ vs .ingest-lock.json → NEW + UPDATED files
   claude -p --model sonnet (single session for all selected files)
-  write .ingest-lock.json + git commit + git push
+  write .ingest-lock.json + git commit (with safe fix + LLM fix retry) + git push
 
 Org root is detected by walking up for a dir containing ${pc.cyan("raw/")} and ${pc.cyan("CLAUDE.md")}.
 `;
+
+function reportSafeFixes(applied: AppliedFix[]): void {
+  if (applied.length === 0) return;
+  console.log(pc.green(`  ✓ applied ${applied.length} safe fix(es)`));
+  for (const f of applied) {
+    console.log(pc.dim(`    ${f.kind}: ${f.description}`));
+  }
+}
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
@@ -429,6 +535,19 @@ async function main(): Promise<void> {
   }
 
   const orgRoot = findOrgRoot(process.cwd());
+
+  if (args.includes("--fix")) {
+    const result = runSafeFixes(orgRoot);
+    if (result.applied.length === 0) {
+      console.log(pc.green("✓") + " no safe fixes needed");
+    } else {
+      console.log(pc.green(`✓ applied ${result.applied.length} safe fix(es):`));
+      for (const f of result.applied) {
+        console.log(pc.dim(`  ${f.kind}: ${f.description}`));
+      }
+    }
+    return;
+  }
 
   gitPull(orgRoot);
 
@@ -482,20 +601,73 @@ async function main(): Promise<void> {
 
   const ok = await runClaude(orgRoot, toIngest);
 
-  if (ok) {
-    for (const f of toIngest) writeLockEntry(orgRoot, f.rel, []);
-    try {
-      commitIngest(orgRoot, toIngest.map((f) => f.rel));
-      console.log(pc.green("✓") + " done");
-    } catch (e) {
-      console.warn(pc.yellow("⚠") + " git commit failed:", (e as Error).message);
-    }
-  } else {
+  if (!ok) {
     console.error(pc.red("✗") + " claude exited with non-zero status");
     process.exit(1);
   }
 
+  for (const f of toIngest) writeLockEntry(orgRoot, f.rel, []);
 
+  const filePaths = toIngest.map((f) => f.rel);
+  const MAX_FIX_ATTEMPTS = 2;
+
+  let result: CommitResult;
+  try {
+    result = commitIngest(orgRoot, filePaths);
+  } catch (e) {
+    console.warn(pc.yellow("⚠") + " git commit failed:", (e as Error).message);
+    gitPush(orgRoot);
+    return;
+  }
+
+  for (let attempt = 1; !result.ok && attempt <= MAX_FIX_ATTEMPTS; attempt++) {
+    console.warn(
+      pc.yellow(`⚠ pre-commit hook rejected commit (fix attempt ${attempt}/${MAX_FIX_ATTEMPTS})`),
+    );
+    for (const line of result.error.split("\n")) {
+      console.warn(pc.dim("  " + line));
+    }
+
+    // Stage 1: deterministic safe fixes (no LLM cost). Retry commit; if it
+    // passes, skip the LLM call entirely.
+    const safe = runSafeFixes(orgRoot);
+    reportSafeFixes(safe.applied);
+    if (safe.applied.length > 0) {
+      try {
+        result = commitIngest(orgRoot, filePaths);
+      } catch (e) {
+        console.warn(pc.yellow("⚠") + " git commit failed:", (e as Error).message);
+        gitPush(orgRoot);
+        return;
+      }
+      if (result.ok) break;
+    }
+
+    // Stage 2: LLM fallback for errors safe-fix can't repair (missing :ID:,
+    // duplicate :ID:, broken link with no/multiple title matches, etc.).
+    const fixOk = await runClaudeFix(orgRoot, result.error, toIngest);
+    if (!fixOk) {
+      console.error(pc.red("✗") + " claude fix exited with non-zero status");
+      break;
+    }
+    try {
+      result = commitIngest(orgRoot, filePaths);
+    } catch (e) {
+      console.warn(pc.yellow("⚠") + " git commit failed:", (e as Error).message);
+      gitPush(orgRoot);
+      return;
+    }
+  }
+
+  if (!result.ok) {
+    console.error(pc.red("✗") + " git commit still failing after fix attempts:");
+    for (const line of result.error.split("\n")) {
+      console.error(pc.dim("  " + line));
+    }
+    process.exit(1);
+  }
+
+  console.log(pc.green("✓") + " done");
   gitPush(orgRoot);
 }
 
