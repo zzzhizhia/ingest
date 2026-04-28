@@ -5,6 +5,7 @@ import { realpathSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import pc from "picocolors";
+import { listPages, runExport } from "./export.js";
 import { runSafeFixes, type AppliedFix } from "./fix.js";
 import { installPreCommitHook } from "./init.js";
 import { readLock, writeLockEntry } from "./lock.js";
@@ -504,11 +505,17 @@ ${pc.bold("Usage")}
   ingest <path> [path ...]   ingest specific files directly
   ingest init                install/refresh .git/hooks/pre-commit
   ingest --fix               apply safe auto-fixes to wiki files (no ingest)
+  ingest export <id>         render id + linked neighborhood as one HTML
+  ingest export --list       list all wiki pages (id, category, title)
 
 ${pc.bold("Options")}
   -a, --all       ingest all pending files without prompting
       --fix       apply deterministic safe fixes (tag-file mismatch,
                   broken-link with unique title match) and exit
+      --depth N   BFS hops for export (default 1)
+      --backlinks include reverse links during BFS for export
+      --output P  output HTML path for export (default Denote-style filename)
+      --open      open the exported HTML after writing it
   -h, --help      show this help and exit
 
 ${pc.bold("Flow")}
@@ -528,6 +535,20 @@ function reportSafeFixes(applied: AppliedFix[]): void {
   }
 }
 
+// Tiny --foo / --foo=bar / --foo bar option reader. Returns the value or
+// undefined; doesn't validate or consume the args array.
+function getOpt(args: string[], name: string): string | undefined {
+  const eqPrefix = name + "=";
+  const eq = args.find((a) => a.startsWith(eqPrefix));
+  if (eq) return eq.slice(eqPrefix.length);
+  const idx = args.indexOf(name);
+  if (idx >= 0 && idx + 1 < args.length) {
+    const next = args[idx + 1];
+    if (!next.startsWith("-")) return next;
+  }
+  return undefined;
+}
+
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
 
@@ -539,6 +560,51 @@ async function main(): Promise<void> {
   const orgRoot = findOrgRoot(process.cwd());
 
   const positional = args.filter((a) => !a.startsWith("-"));
+
+  if (positional[0] === "export") {
+    if (args.includes("--list")) {
+      listPages(orgRoot);
+      return;
+    }
+    const startId = positional[1];
+    if (!startId) {
+      console.error(
+        pc.red("✗") +
+          " usage: ingest export <id> [--depth N] [--backlinks] [--output PATH] [--open]",
+      );
+      console.error(pc.dim("       ingest export --list   to list available IDs"));
+      process.exit(1);
+    }
+    const depthStr = getOpt(args, "--depth") ?? "1";
+    const depth = Number.parseInt(depthStr, 10);
+    if (!Number.isFinite(depth) || depth < 0) {
+      console.error(pc.red("✗") + ` invalid --depth: ${depthStr}`);
+      process.exit(1);
+    }
+    const backlinks = args.includes("--backlinks");
+    const outputPath = getOpt(args, "--output");
+    try {
+      const result = await runExport(orgRoot, {
+        startId,
+        depth,
+        backlinks,
+        outputPath,
+      });
+      console.log(
+        pc.green("✓") +
+          ` ${result.pageCount} page(s) → ` +
+          pc.cyan(result.outputPath),
+      );
+      if (args.includes("--open")) {
+        execFileSync("open", [result.outputPath], { stdio: "ignore" });
+      }
+    } catch (e) {
+      console.error(pc.red("✗") + " " + (e as Error).message);
+      process.exit(1);
+    }
+    return;
+  }
+
   if (positional[0] === "init") {
     const result = installPreCommitHook(orgRoot);
     switch (result.action) {
