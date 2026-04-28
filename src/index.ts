@@ -514,7 +514,8 @@ ${pc.bold("Options")}
                   broken-link with unique title match) and exit
       --depth N   BFS hops for export (default 1)
       --backlinks include reverse links during BFS for export
-      --output P  output HTML path for export (default Denote-style filename)
+      --output P  output HTML path for export (full path)
+      --output-root D  directory for export with auto Denote-style stem
       --open      open the exported HTML after writing it
   -h, --help      show this help and exit
 
@@ -550,6 +551,13 @@ function getOpt(args: string[], name: string): string | undefined {
 }
 
 async function main(): Promise<void> {
+  // Allow piping to `head`, `fzf`, etc. without crashing when the consumer
+  // closes stdout early.
+  process.stdout.on("error", (err) => {
+    if ((err as NodeJS.ErrnoException).code === "EPIPE") process.exit(0);
+    throw err;
+  });
+
   const args = process.argv.slice(2);
 
   if (args.includes("--help") || args.includes("-h")) {
@@ -583,12 +591,14 @@ async function main(): Promise<void> {
     }
     const backlinks = args.includes("--backlinks");
     const outputPath = getOpt(args, "--output");
+    const outputRoot = getOpt(args, "--output-root");
     try {
       const result = await runExport(orgRoot, {
         startId,
         depth,
         backlinks,
         outputPath,
+        outputRoot,
       });
       console.log(
         pc.green("✓") +

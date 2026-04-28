@@ -536,7 +536,11 @@ export type ExportOptions = {
   startId: string;
   depth: number;
   backlinks: boolean;
+  // Full path overrides everything. If omitted, the file goes under
+  // outputRoot (or orgRoot when outputRoot is also omitted) with an
+  // auto-generated Denote stem.
   outputPath?: string;
+  outputRoot?: string;
 };
 
 export type ExportResult = {
@@ -579,7 +583,9 @@ export async function runExport(
     opts.backlinks,
   );
 
-  const outputPath = opts.outputPath ?? join(orgRoot, denoteStem(startPage) + ".html");
+  const outputPath =
+    opts.outputPath ??
+    join(opts.outputRoot ?? orgRoot, denoteStem(startPage) + ".html");
   mkdirSync(dirname(outputPath), { recursive: true });
   writeFileSync(outputPath, html);
 
