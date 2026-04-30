@@ -711,7 +711,7 @@ async function main(): Promise<void> {
       process.stdout.write(pc.dim(`converting ${f.rel}...`));
       const pdf = convertOfficeToPdf(orgRoot, f.rel);
       pdfMap.set(f.rel, pdf);
-      process.stdout.write(`\r${pc.dim(`converted  ${f.rel} → ${pdf}`)}\n`);
+      process.stdout.write(`\r${pc.dim(`converted ${f.rel} → ${pdf}`)}\n`);
     }
   }
 
