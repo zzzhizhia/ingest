@@ -116,8 +116,14 @@ describe("extractReferencedFiles", () => {
   });
 
   it("returns empty for PDF without reading binary content", () => {
-    // Binary content would throw if read as utf8 and parsed
     make("raw/clips/doc.pdf", "%PDF-1.4\n%\x00\x01\x02 binary");
     expect(extractReferencedFiles(TMP, "raw/clips/doc.pdf")).toEqual([]);
+  });
+
+  it("returns empty for Office files (docx/pptx/xlsx)", () => {
+    for (const ext of [".doc", ".docx", ".ppt", ".pptx", ".xls", ".xlsx"]) {
+      make(`raw/drafts/file${ext}`, "PK\x03\x04 fake office");
+      expect(extractReferencedFiles(TMP, `raw/drafts/file${ext}`)).toEqual([]);
+    }
   });
 });

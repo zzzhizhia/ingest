@@ -9,6 +9,7 @@ import { listPages, runExport } from "./export.js";
 import { runSafeFixes, type AppliedFix } from "./fix.js";
 import { installPreCommitHook } from "./init.js";
 import { readLock, writeLockEntry } from "./lock.js";
+import { convertOfficeToPdf, isOfficeFile } from "./convert.js";
 import { extractReferencedFiles } from "./references.js";
 import { scanPendingFiles, type PendingFile } from "./scanner.js";
 
@@ -176,6 +177,11 @@ const SYSTEM_PROMPT = `\
 
 多个文件可合并为一条日志，用简短标题概括。
 
+## Office 文件
+
+doc/docx/ppt/pptx/xls/xlsx 格式已预转换为 PDF。提示中会注明 PDF 路径（\`→ 读取 /tmp/ingest/...\`），
+用 Read 工具读取该 PDF 路径，而非原始 Office 文件。:SOURCES: 仍指向原始文件路径。
+
 ## 安全规则
 
 1. **绝不删除**已有 wiki heading。只能创建或更新。
@@ -192,11 +198,16 @@ const SYSTEM_PROMPT = `\
 - 不修改 summary.org 的仪表盘 babel 块
 `;
 
-function buildPrompt(files: PendingFile[]): string {
+function buildPrompt(
+  files: PendingFile[],
+  pdfMap: Map<string, string>,
+): string {
   const list = files
     .map((f, i) => {
       const tag = f.status === "new" ? "[NEW]" : "[UPDATED]";
-      return `${i + 1}. ${tag} ${f.rel}`;
+      const pdf = pdfMap.get(f.rel);
+      const note = pdf ? `  → 读取 ${pdf}` : "";
+      return `${i + 1}. ${tag} ${f.rel}${note}`;
     })
     .join("\n");
   return (
@@ -284,11 +295,15 @@ async function invokeClaude(opts: ClaudeRunOpts): Promise<boolean> {
   });
 }
 
-async function runClaude(orgRoot: string, files: PendingFile[]): Promise<boolean> {
+async function runClaude(
+  orgRoot: string,
+  files: PendingFile[],
+  pdfMap: Map<string, string>,
+): Promise<boolean> {
   return invokeClaude({
     orgRoot,
     systemPrompt: SYSTEM_PROMPT,
-    prompt: buildPrompt(files),
+    prompt: buildPrompt(files, pdfMap),
     label: "claude",
   });
 }
@@ -690,6 +705,16 @@ async function main(): Promise<void> {
     }
   }
 
+  const pdfMap = new Map<string, string>();
+  for (const f of toIngest) {
+    if (isOfficeFile(f.rel)) {
+      process.stdout.write(pc.dim(`converting ${f.rel}...`));
+      const pdf = convertOfficeToPdf(orgRoot, f.rel);
+      pdfMap.set(f.rel, pdf);
+      process.stdout.write(`\r${pc.dim(`converted  ${f.rel} → ${pdf}`)}\n`);
+    }
+  }
+
   console.log();
   console.log(
     "─".repeat(60) + "\n" +
@@ -702,7 +727,7 @@ async function main(): Promise<void> {
     "\n\n" + pc.dim("Ingesting..."),
   );
 
-  const ok = await runClaude(orgRoot, toIngest);
+  const ok = await runClaude(orgRoot, toIngest, pdfMap);
 
   if (!ok) {
     console.error(pc.red("✗") + " claude exited with non-zero status");

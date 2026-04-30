@@ -11,7 +11,15 @@ const ORG_LINK = /\[\[(?:file:)?([^\]\[]+?)(?:\]\[[^\]]*)?\]\]/g;
 const MD_LINK = /!?\[[^\]]*\]\(([^)\s]+)\)/g;
 
 // Binary formats: can't parse as text. No references to extract.
-const BINARY_EXT = new Set([".pdf"]);
+const BINARY_EXT = new Set([
+  ".pdf",
+  ".doc",
+  ".docx",
+  ".ppt",
+  ".pptx",
+  ".xls",
+  ".xlsx",
+]);
 
 /**
  * Parse a source file for references to other local files.

@@ -73,6 +73,20 @@ describe("scanPendingFiles", () => {
     expect(results).toEqual([{ rel: "raw/papers/paper.pdf", status: "new" }]);
   });
 
+  it("includes Office files (doc/docx/ppt/pptx/xls/xlsx)", () => {
+    makeOrg(TMP, "raw/drafts/slides.pptx", "PK\x03\x04 fake");
+    makeOrg(TMP, "raw/drafts/report.docx", "PK\x03\x04 fake");
+    makeOrg(TMP, "raw/drafts/data.xlsx", "PK\x03\x04 fake");
+    const results = scanPendingFiles(TMP, emptyLock());
+    const rels = results.map((r) => r.rel).sort();
+    expect(rels).toEqual([
+      "raw/drafts/data.xlsx",
+      "raw/drafts/report.docx",
+      "raw/drafts/slides.pptx",
+    ]);
+    for (const r of results) expect(r.status).toBe("new");
+  });
+
   it("handles multiple files mixed new/updated/done", () => {
     makeOrg(TMP, "raw/a.org", "a");
     makeOrg(TMP, "raw/b.md", "b");

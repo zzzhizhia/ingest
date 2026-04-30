@@ -10,7 +10,18 @@ export interface PendingFile {
   status: FileStatus;
 }
 
-const SUPPORTED = new Set([".org", ".md", ".txt", ".pdf"]);
+const SUPPORTED = new Set([
+  ".org",
+  ".md",
+  ".txt",
+  ".pdf",
+  ".doc",
+  ".docx",
+  ".ppt",
+  ".pptx",
+  ".xls",
+  ".xlsx",
+]);
 
 function* walkDir(dir: string): Generator<string> {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
