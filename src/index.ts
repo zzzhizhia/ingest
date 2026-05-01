@@ -708,10 +708,10 @@ async function main(): Promise<void> {
   const pdfMap = new Map<string, string>();
   for (const f of toIngest) {
     if (isOfficeFile(f.rel)) {
-      process.stdout.write(pc.dim(`converting ${f.rel}...`));
+      process.stdout.write(pc.dim(`→ converting ${f.rel}...`));
       const pdf = convertOfficeToPdf(orgRoot, f.rel);
       pdfMap.set(f.rel, pdf);
-      process.stdout.write(`\r${pc.dim(`converted ${f.rel} → ${pdf}`)}\n`);
+      process.stdout.write(`\r${pc.green("✓")} ${pc.dim(`converted ${f.rel} → ${pdf}`)}\n`);
     }
   }
 
