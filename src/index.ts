@@ -430,6 +430,17 @@ function gitPull(orgRoot: string): void {
   process.stdout.write("\r" + pc.dim("↓ " + msg + (didStash ? " (stashed/popped)" : "")) + "\n");
 }
 
+function gitSubmoduleUpdate(orgRoot: string): void {
+  process.stdout.write(pc.dim("↓ updating submodules..."));
+  const result = spawnSync(
+    "git",
+    ["submodule", "update", "--remote", "--init"],
+    { cwd: orgRoot, encoding: "utf8" },
+  );
+  if (result.status !== 0) throw new Error(result.stderr?.trim() ?? "git submodule update failed");
+  process.stdout.write("\r" + pc.dim("↓ submodules up to date") + "\n");
+}
+
 function gitPush(orgRoot: string): void {
   execFileSync("git", ["push"], { cwd: orgRoot, stdio: "ignore" });
   console.log(pc.dim("↑ pushed"));
@@ -673,6 +684,7 @@ async function main(): Promise<void> {
   }
 
   gitPull(orgRoot);
+  gitSubmoduleUpdate(orgRoot);
 
   const allFlag = args.includes("--all") || args.includes("-a");
   const explicitFiles = args.filter((a) => !a.startsWith("-"));
