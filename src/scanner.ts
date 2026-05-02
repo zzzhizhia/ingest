@@ -8,6 +8,8 @@ export type FileStatus = "new" | "updated";
 export interface PendingFile {
   rel: string;
   status: FileStatus;
+  /** Absolute path to the submodule root, or undefined for main-repo files. */
+  submoduleRoot?: string;
 }
 
 const SUPPORTED = new Set([
@@ -30,16 +32,18 @@ const WIKI_FILES = new Set([
   "analyses.org",
 ]);
 
-function* walkDir(dir: string): Generator<string> {
-  const inSubmodule = existsSync(join(dir, ".git"));
+function* walkDir(dir: string, submoduleRoot?: string): Generator<{ abs: string; submoduleRoot?: string }> {
+  const isSubmodule = existsSync(join(dir, ".git"));
+  const currentSubmodule = isSubmodule ? dir : submoduleRoot;
+
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const full = join(dir, entry.name);
     if (entry.isDirectory()) {
-      yield* walkDir(full);
+      yield* walkDir(full, currentSubmodule);
     } else if (entry.isFile()) {
-      if (inSubmodule && WIKI_FILES.has(entry.name)) continue;
+      if (isSubmodule && WIKI_FILES.has(entry.name)) continue;
       const ext = entry.name.slice(entry.name.lastIndexOf("."));
-      if (SUPPORTED.has(ext)) yield full;
+      if (SUPPORTED.has(ext)) yield { abs: full, submoduleRoot: currentSubmodule };
     }
   }
 }
@@ -52,15 +56,16 @@ export function scanPendingFiles(
   const locked = lock.files ?? {};
   const results: PendingFile[] = [];
 
-  for (const absPath of [...walkDir(rawDir)].sort()) {
-    const rel = relative(orgRoot, absPath);
-    const currentHash = fileHash(absPath);
+  const entries = [...walkDir(rawDir)].sort((a, b) => a.abs.localeCompare(b.abs));
+  for (const { abs, submoduleRoot } of entries) {
+    const rel = relative(orgRoot, abs);
+    const currentHash = fileHash(abs);
     const entry = locked[rel];
 
     if (!entry) {
-      results.push({ rel, status: "new" });
+      results.push({ rel, status: "new", submoduleRoot });
     } else if (entry.contentHash.replace("sha256:", "") !== currentHash) {
-      results.push({ rel, status: "updated" });
+      results.push({ rel, status: "updated", submoduleRoot });
     }
   }
 

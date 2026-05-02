@@ -2,7 +2,7 @@ import { checkbox } from "@inquirer/prompts";
 import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { realpathSync } from "node:fs";
-import { basename, join, resolve } from "node:path";
+import { basename, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import pc from "picocolors";
 import { listPages, runExport } from "./export.js";
@@ -203,21 +203,37 @@ doc/docx/ppt/pptx/xls/xlsx 格式已预转换为 PDF。提示中会注明 PDF �
 - 不修改 summary.org 的仪表盘 babel 块
 `;
 
+const SUBMODULE_SYSTEM_PROMPT = SYSTEM_PROMPT
+  .replace(
+    "| summary.org    | 元文件，包含日志（仅追加日志条目，不修改其他部分） |  |",
+    "",
+  )
+  .replace(
+    /## 完成所有文件后[\s\S]*?多个文件可合并为一条日志，用简短标题概括。/,
+    "## 完成所有文件后\n\n无需更新 summary.org（子知识库不使用此文件）。",
+  );
+
 function buildPrompt(
+  orgRoot: string,
   files: PendingFile[],
   pdfMap: Map<string, string>,
+  submoduleRoot?: string,
 ): string {
   const list = files
     .map((f, i) => {
       const tag = f.status === "new" ? "[NEW]" : "[UPDATED]";
+      const displayPath = submoduleRoot
+        ? relative(submoduleRoot, join(orgRoot, f.rel))
+        : f.rel;
       const pdf = pdfMap.get(f.rel);
       const note = pdf ? `  → 读取 ${pdf}` : "";
-      return `${i + 1}. ${tag} ${f.rel}${note}`;
+      return `${i + 1}. ${tag} ${displayPath}${note}`;
     })
     .join("\n");
+  const suffix = submoduleRoot ? "" : "全部完成后统一更新 summary.org。";
   return (
     `依次消化以下 ${files.length} 个源文件，每个文件完整执行对应工作流后再处理下一个，` +
-    `全部完成后统一更新 summary.org。\n\n${list}`
+    `${suffix}\n\n${list}`
   );
 }
 
@@ -304,12 +320,15 @@ async function runClaude(
   orgRoot: string,
   files: PendingFile[],
   pdfMap: Map<string, string>,
+  submoduleRoot?: string,
 ): Promise<boolean> {
+  const cwd = submoduleRoot ?? orgRoot;
+  const label = submoduleRoot ? `claude (${basename(submoduleRoot)})` : "claude";
   return invokeClaude({
-    orgRoot,
-    systemPrompt: SYSTEM_PROMPT,
-    prompt: buildPrompt(files, pdfMap),
-    label: "claude",
+    orgRoot: cwd,
+    systemPrompt: submoduleRoot ? SUBMODULE_SYSTEM_PROMPT : SYSTEM_PROMPT,
+    prompt: buildPrompt(orgRoot, files, pdfMap, submoduleRoot),
+    label,
   });
 }
 
@@ -472,14 +491,51 @@ function sourcePathsToAdd(orgRoot: string, files: string[]): string[] {
 
 type CommitResult = { ok: true } | { ok: false; error: string };
 
-function commitIngest(orgRoot: string, files: string[]): CommitResult {
+const SUBMODULE_WIKI_FILES = [
+  "entities.org",
+  "concepts.org",
+  "sources.org",
+  "analyses.org",
+];
+
+function commitSubmodule(submoduleRoot: string, files: PendingFile[]): CommitResult {
+  const label =
+    files.length === 1
+      ? basename(files[0].rel)
+      : `${files.length} files`;
+
+  execFileSync("git", ["add", ...SUBMODULE_WIKI_FILES], { cwd: submoduleRoot, stdio: "pipe" });
+
+  const hasChanges =
+    execFileSync("git", ["status", "--porcelain", ...SUBMODULE_WIKI_FILES], {
+      cwd: submoduleRoot,
+    })
+      .toString()
+      .trim().length > 0;
+
+  if (!hasChanges) return { ok: true };
+
+  const result = spawnSync("git", ["commit", "-m", `[ingest] ${label}`], {
+    cwd: submoduleRoot,
+    encoding: "utf8",
+  });
+
+  if (result.status !== 0) {
+    const error = ((result.stdout ?? "") + (result.stderr ?? "")).trim();
+    return { ok: false, error };
+  }
+  console.log(pc.dim(`  committed (${basename(submoduleRoot)}): [ingest] ${label}`));
+  return { ok: true };
+}
+
+function commitIngest(orgRoot: string, files: string[], submodulePaths: string[] = []): CommitResult {
   const label =
     files.length === 1
       ? basename(files[0])
       : `${files.length} files`;
 
   const sources = sourcePathsToAdd(orgRoot, files);
-  const allPaths = [...WIKI_FILES, ...sources];
+  const allPaths = [...WIKI_FILES, ...sources, ...submodulePaths];
 
   execFileSync("git", ["add", ...allPaths], { cwd: orgRoot, stdio: "pipe" });
 
@@ -722,6 +778,20 @@ async function main(): Promise<void> {
     }
   }
 
+  // ── group files by submodule ──
+  const mainFiles: PendingFile[] = [];
+  const submoduleGroups = new Map<string, PendingFile[]>();
+  for (const f of toIngest) {
+    if (f.submoduleRoot) {
+      const group = submoduleGroups.get(f.submoduleRoot) ?? [];
+      group.push(f);
+      submoduleGroups.set(f.submoduleRoot, group);
+    } else {
+      mainFiles.push(f);
+    }
+  }
+
+  // ── office conversion ──
   const pdfMap = new Map<string, string>();
   for (const f of toIngest) {
     if (isOfficeFile(f.rel)) {
@@ -738,27 +808,61 @@ async function main(): Promise<void> {
     toIngest
       .map((f, i) => {
         const tag = f.status === "new" ? pc.green("[NEW]") : pc.yellow("[UPDATED]");
-        return pc.bold(`${i + 1}.`) + " " + tag + " " + f.rel;
+        const scope = f.submoduleRoot ? pc.dim(` (${basename(f.submoduleRoot)})`) : "";
+        return pc.bold(`${i + 1}.`) + " " + tag + " " + f.rel + scope;
       })
       .join("\n") +
     "\n\n" + pc.dim("Ingesting..."),
   );
 
-  const ok = await runClaude(orgRoot, toIngest, pdfMap);
-
-  if (!ok) {
-    console.error(pc.red("✗") + " claude exited with non-zero status");
-    process.exit(1);
+  // ── run Claude: main repo files ──
+  if (mainFiles.length > 0) {
+    const ok = await runClaude(orgRoot, mainFiles, pdfMap);
+    if (!ok) {
+      console.error(pc.red("✗") + " claude exited with non-zero status");
+      process.exit(1);
+    }
   }
 
+  // ── run Claude: submodule files (each group with its own cwd) ──
+  for (const [smRoot, smFiles] of submoduleGroups) {
+    const ok = await runClaude(orgRoot, smFiles, pdfMap, smRoot);
+    if (!ok) {
+      console.error(pc.red("✗") + ` claude exited with non-zero status (${basename(smRoot)})`);
+      process.exit(1);
+    }
+  }
+
+  // ── lock ──
   for (const f of toIngest) writeLockEntry(orgRoot, f.rel, []);
 
-  const filePaths = toIngest.map((f) => f.rel);
+  // ── commit submodules first ──
+  const committedSubmodules: string[] = [];
+  for (const [smRoot, smFiles] of submoduleGroups) {
+    const smResult = commitSubmodule(smRoot, smFiles);
+    if (!smResult.ok) {
+      console.warn(pc.yellow("⚠") + ` submodule commit failed (${basename(smRoot)}): ${smResult.error}`);
+    } else {
+      committedSubmodules.push(relative(orgRoot, smRoot));
+    }
+  }
+
+  // ── push submodules before main repo ──
+  for (const smRoot of submoduleGroups.keys()) {
+    try {
+      gitPush(smRoot);
+    } catch {
+      console.warn(pc.yellow("⚠") + ` failed to push submodule ${basename(smRoot)}`);
+    }
+  }
+
+  // ── commit main repo (wiki files + lock + submodule pointers) ──
+  const mainFilePaths = mainFiles.map((f) => f.rel);
   const MAX_FIX_ATTEMPTS = 2;
 
   let result: CommitResult;
   try {
-    result = commitIngest(orgRoot, filePaths);
+    result = commitIngest(orgRoot, mainFilePaths, committedSubmodules);
   } catch (e) {
     console.warn(pc.yellow("⚠") + " git commit failed:", (e as Error).message);
     gitPush(orgRoot);
@@ -773,13 +877,11 @@ async function main(): Promise<void> {
       console.warn(pc.dim("  " + line));
     }
 
-    // Stage 1: deterministic safe fixes (no LLM cost). Retry commit; if it
-    // passes, skip the LLM call entirely.
     const safe = runSafeFixes(orgRoot);
     reportSafeFixes(safe.applied);
     if (safe.applied.length > 0) {
       try {
-        result = commitIngest(orgRoot, filePaths);
+        result = commitIngest(orgRoot, mainFilePaths, committedSubmodules);
       } catch (e) {
         console.warn(pc.yellow("⚠") + " git commit failed:", (e as Error).message);
         gitPush(orgRoot);
@@ -788,15 +890,13 @@ async function main(): Promise<void> {
       if (result.ok) break;
     }
 
-    // Stage 2: LLM fallback for errors safe-fix can't repair (missing :ID:,
-    // duplicate :ID:, broken link with no/multiple title matches, etc.).
-    const fixOk = await runClaudeFix(orgRoot, result.error, toIngest);
+    const fixOk = await runClaudeFix(orgRoot, result.error, mainFiles);
     if (!fixOk) {
       console.error(pc.red("✗") + " claude fix exited with non-zero status");
       break;
     }
     try {
-      result = commitIngest(orgRoot, filePaths);
+      result = commitIngest(orgRoot, mainFilePaths, committedSubmodules);
     } catch (e) {
       console.warn(pc.yellow("⚠") + " git commit failed:", (e as Error).message);
       gitPush(orgRoot);
