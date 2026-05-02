@@ -1,4 +1,4 @@
-import { readdirSync } from "node:fs";
+import { readdirSync, existsSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileHash } from "./lock.js";
 import type { LockFile } from "./lock.js";
@@ -23,12 +23,21 @@ const SUPPORTED = new Set([
   ".xlsx",
 ]);
 
+const WIKI_FILES = new Set([
+  "entities.org",
+  "concepts.org",
+  "sources.org",
+  "analyses.org",
+]);
+
 function* walkDir(dir: string): Generator<string> {
+  const inSubmodule = existsSync(join(dir, ".git"));
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const full = join(dir, entry.name);
     if (entry.isDirectory()) {
       yield* walkDir(full);
     } else if (entry.isFile()) {
+      if (inSubmodule && WIKI_FILES.has(entry.name)) continue;
       const ext = entry.name.slice(entry.name.lastIndexOf("."));
       if (SUPPORTED.has(ext)) yield full;
     }
