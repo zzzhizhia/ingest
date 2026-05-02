@@ -52,11 +52,17 @@ export function scanPendingFiles(
   orgRoot: string,
   lock: LockFile,
 ): PendingFile[] {
-  const rawDir = join(orgRoot, "raw");
   const locked = lock.files ?? {};
   const results: PendingFile[] = [];
 
-  const entries = [...walkDir(rawDir)].sort((a, b) => a.abs.localeCompare(b.abs));
+  const scanRoots = [join(orgRoot, "raw")];
+  const subsDir = join(orgRoot, "subs");
+  if (existsSync(subsDir)) scanRoots.push(subsDir);
+
+  const entries = scanRoots
+    .flatMap((root) => [...walkDir(root)])
+    .sort((a, b) => a.abs.localeCompare(b.abs));
+
   for (const { abs, submoduleRoot } of entries) {
     const rel = relative(orgRoot, abs);
     const currentHash = fileHash(abs);
