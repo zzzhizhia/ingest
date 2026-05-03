@@ -68,14 +68,13 @@ Key properties:
 ## Install
 
 ```bash
-npm install -g ingest
+npx @zzzhizhia/ingest
 ```
 
-Or link locally for development:
+Or install globally:
 
 ```bash
-cd ~/Developer/zzzhizhia/ingest
-pnpm link --global
+npm install -g @zzzhizhia/ingest
 ```
 
 ## Usage
