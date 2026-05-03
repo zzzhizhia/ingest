@@ -656,47 +656,20 @@ async function main(): Promise<void> {
 
   const positional = args.filter((a) => !a.startsWith("-"));
 
-  // Handle `init` before findOrgRoot — it may create a new wiki in a
-  // directory that has no org root yet.
   if (positional[0] === "init") {
-    const target = positional[1];
-    if (target) {
-      const result = scaffoldWiki(resolve(target));
-      console.log(pc.green("✓") + " created wiki at " + pc.cyan(result.dir));
-      for (const f of result.created) console.log(pc.dim("  + " + f));
-      for (const f of result.skipped) console.log(pc.dim("  · " + f + " (exists)"));
-      return;
-    }
+    const dir = positional[1] ? resolve(positional[1]) : process.cwd();
+    const scaffold = scaffoldWiki(dir);
+    console.log(pc.green("✓") + " wiki at " + pc.cyan(scaffold.dir));
+    for (const f of scaffold.created) console.log(pc.dim("  + " + f));
+    for (const f of scaffold.skipped) console.log(pc.dim("  · " + f + " (exists)"));
 
-    let orgRoot: string | null = null;
-    try { orgRoot = findOrgRoot(process.cwd()); } catch {}
-
-    if (orgRoot) {
-      const result = installPreCommitHook(orgRoot);
-      switch (result.action) {
-        case "wrote":
-          console.log(pc.green("✓") + " installed " + pc.cyan(result.path));
-          break;
-        case "skipped":
-          console.log(pc.green("✓") + " " + pc.cyan(result.path) + " already up to date");
-          break;
-        case "replaced-symlink":
-          console.log(
-            pc.green("✓") + " replaced symlink with regular file at " + pc.cyan(result.path),
-          );
-          break;
-        case "replaced-and-backed-up":
-          console.log(
-            pc.green("✓") + " installed " + pc.cyan(result.path) +
-              pc.dim(`  (previous content backed up to ${result.backupPath})`),
-          );
-          break;
+    if (existsSync(join(dir, ".git"))) {
+      const hook = installPreCommitHook(dir);
+      if (hook.action === "skipped") {
+        console.log(pc.dim("  · pre-commit hook up to date"));
+      } else {
+        console.log(pc.dim("  + pre-commit hook"));
       }
-    } else {
-      const result = scaffoldWiki(process.cwd());
-      console.log(pc.green("✓") + " created wiki at " + pc.cyan(result.dir));
-      for (const f of result.created) console.log(pc.dim("  + " + f));
-      for (const f of result.skipped) console.log(pc.dim("  · " + f + " (exists)"));
     }
     return;
   }
