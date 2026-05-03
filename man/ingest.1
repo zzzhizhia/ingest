@@ -1,0 +1,210 @@
+.TH INGEST 1 "2026-05-03" "ingest 1.0.0" "Ingest Manual"
+.SH NAME
+ingest \- interactive CLI for ingesting source files into an org-mode LLM wiki
+.SH SYNOPSIS
+.B ingest
+.RI [ options ]
+.br
+.B ingest
+.RI [ command ]
+.RI [ args ]
+.SH DESCRIPTION
+.B ingest
+scans source files under
+.B raw/
+and
+.B subs/
+, invokes Claude to extract structured knowledge, and writes it into org-mode wiki category files
+.RB ( entities.org ", " concepts.org ", " sources.org ", " analyses.org ).
+.PP
+The CLI handles git operations (pull, commit, push), lock file tracking, pre-commit validation, and submodule knowledge base independence.
+.SH COMMANDS
+.TP
+.B ingest
+Interactive checkbox to select pending files for ingestion.
+.TP
+.BI "ingest \-\-all"
+Ingest all pending files without prompting.
+.TP
+.BI "ingest " path " [" path "...]"
+Ingest specific files directly.
+.TP
+.B ingest status
+Show pending files (new + updated), submodule grouping, and current config.
+.TP
+.BI "ingest init [" path ]
+Scaffold a blank wiki template. Creates category files, ingest-lock.json, ingest.json, raw/, subs/, .gitignore, .gitattributes, and CLAUDE.md. Installs pre-commit hook if target is a git repository.
+.TP
+.BI "ingest forget " path
+Remove a file from the lock, making it pending again for re-ingestion. Wiki pages are not affected.
+.TP
+.B ingest lint
+Validate wiki files for format compliance, link integrity, ID uniqueness, and property drawer balance.
+.TP
+.B ingest lint \-\-fix
+Validate and apply safe deterministic auto-fixes (tag mismatch, broken links with unique title match).
+.TP
+.BI "ingest query " question
+Ask a question against the wiki via Claude in read-only mode. Output is rendered with
+.BR glow (1)
+in interactive terminals, plain text when piped.
+.TP
+.BI "ingest export " id " [" options ]
+Render a wiki page and its linked neighborhood as one HTML bundle with sticky TOC and SPA navigation.
+.TP
+.B ingest export \-\-list
+List all wiki pages (id, category, title) in TSV format.
+.TP
+.B ingest man
+Show full manual (README) rendered with
+.BR glow (1).
+.SH OPTIONS
+.TP
+.BR \-a ", " \-\-all
+Ingest all pending files without prompting.
+.TP
+.B \-\-verbose
+Stream Claude output in real-time. Default behavior shows a spinner with elapsed time.
+.TP
+.BI \-\-depth " N"
+BFS hops for export (default 1).
+.TP
+.B \-\-backlinks
+Include reverse links during BFS for export.
+.TP
+.BI \-\-output " path"
+Full output path for exported HTML.
+.TP
+.BI \-\-output\-root " dir"
+Directory for export with auto-generated Denote-style filename.
+.TP
+.B \-\-open
+Open exported HTML in browser after writing.
+.TP
+.B \-\-fix
+Apply safe auto-fixes (used with
+.BR lint ).
+.TP
+.BR \-h ", " \-\-help
+Show short help and exit.
+.SH CONFIGURATION
+Place
+.B ingest.json
+at the org root to override defaults:
+.PP
+.RS
+.nf
+{
+  "model": "sonnet",
+  "effort": "medium",
+  "allowedTools": ["Read", "Edit", ...],
+  "prompt": {
+    "systemAppend": "extra instructions",
+    "userPrefix": "prefix text"
+  }
+}
+.fi
+.RE
+.PP
+All fields are optional. Missing fields use defaults.
+.B ingest init
+generates a starter config.
+.SH SUPPORTED FILE TYPES
+.TP
+.B Text
+\&.org, .md, .txt \(em direct read
+.TP
+.B PDF
+\&.pdf \(em direct read
+.TP
+.B Office
+\&.doc, .docx, .ppt, .pptx, .xls, .xlsx \(em pre-converted to PDF via LibreOffice
+.TP
+.B Image
+\&.png, .jpg, .jpeg, .webp, .gif \(em direct read via Claude vision
+.TP
+.B Audio
+\&.m4a, .mp3, .wav, .ogg \(em pre-transcribed via Whisper
+.SH WIKI STRUCTURE
+.PP
+Each org root contains four category files. Every top-level heading follows a template with :ID: (YYYYMMDDTHHMMSS), :DATE:, :SOURCES:, and a file-specific tag (:entity:, :concept:, :source:, :analysis:).
+.PP
+Cross-references use org-id links:
+.BR [[id:YYYYMMDDTHHMMSS][Title]] .
+Links must be bidirectional.
+.SH SUBMODULES
+.PP
+Git submodules under
+.B subs/
+are independent knowledge bases with their own category files and raw/. Submodule Claude sessions run in parallel. Commits happen inside each submodule first, then the main repo commits submodule pointer updates.
+.SH INGESTION FLOW
+.PP
+.nf
+git pull --ff-only (auto stash/pop)
+git submodule update --remote --init
+Scan raw/ + subs/ vs ingest-lock.json
+Pre-convert: Office -> PDF, audio -> text
+Interactive selection (or --all)
+Group by submodule
+Claude sessions (main sequential, subs parallel)
+Write ingest-lock.json (batch)
+Commit submodules + push
+Commit main repo + push
+.fi
+.SH ORG ROOT DETECTION
+The CLI walks up from the current directory looking for
+.BR ingest-lock.json .
+Run
+.B ingest init
+to scaffold a new wiki.
+.SH PRE-COMMIT HOOK
+Installed via
+.BR "ingest init" .
+Validates staged category files: tag presence and correctness, :ID: and :DATE: format, link integrity, ID uniqueness, and drawer balance. If a commit is rejected during ingestion, the CLI retries with safe fixes, then an LLM fix pass.
+.SH ENVIRONMENT
+.TP
+.B TERM
+Used by glow for color output. Defaults to xterm-256color.
+.SH FILES
+.TP
+.B ingest-lock.json
+Digestion state: maps source file paths to content hashes and timestamps.
+.TP
+.B ingest.json
+CLI configuration (model, effort, allowedTools, prompt fragments).
+.TP
+.B entities.org, concepts.org, sources.org, analyses.org
+Wiki category files maintained by Claude.
+.TP
+.B .git/hooks/pre-commit
+Validation hook installed by
+.BR "ingest init" .
+.SH EXIT STATUS
+.TP
+.B 0
+Success.
+.TP
+.B 1
+Error (validation failure, Claude error, unknown command).
+.TP
+.B 130
+Interrupted by user (SIGINT).
+.SH REQUIREMENTS
+Node >= 20,
+.BR claude (1)
+CLI in PATH. Optional:
+.BR LibreOffice
+(Office conversion),
+.BR whisper
+(audio transcription),
+.BR glow (1)
+(rendered output).
+.SH SEE ALSO
+.BR claude (1),
+.BR glow (1),
+.BR whisper (1),
+.BR soffice (1)
+.SH AUTHORS
+zzzhizhi
+.SH LICENSE
+MIT

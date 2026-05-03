@@ -6,8 +6,10 @@
   "bin": {
     "ingest": "./dist/index.mjs"
   },
+  "man": "./man/ingest.1",
   "files": [
-    "dist"
+    "dist",
+    "man"
   ],
   "scripts": {
     "build": "tsup",
