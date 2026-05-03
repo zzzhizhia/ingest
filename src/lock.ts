@@ -5,7 +5,6 @@ import { join } from "node:path";
 export interface LockEntry {
   ingestedAt: string;
   contentHash: string;
-  wikiPages: string[];
 }
 
 export interface LockFile {
@@ -26,7 +25,6 @@ export function readLock(orgRoot: string): LockFile {
 export function writeLockEntry(
   orgRoot: string,
   rel: string,
-  wikiPages: string[],
 ): void {
   const p = lockPath(orgRoot);
   const lock = readLock(orgRoot);
@@ -36,7 +34,6 @@ export function writeLockEntry(
   lock.files[rel] = {
     ingestedAt: new Date().toISOString(),
     contentHash,
-    wikiPages,
   };
   writeFileSync(p, JSON.stringify(lock, null, 2) + "\n", "utf8");
 }

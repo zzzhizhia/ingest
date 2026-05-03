@@ -831,7 +831,7 @@ async function main(): Promise<void> {
   }
 
   // ── lock ──
-  for (const f of toIngest) writeLockEntry(orgRoot, f.rel, []);
+  for (const f of toIngest) writeLockEntry(orgRoot, f.rel);
 
   // ── commit submodules first ──
   const committedSubmodules: string[] = [];

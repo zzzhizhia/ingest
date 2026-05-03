@@ -21,7 +21,6 @@ describe("readLock", () => {
         "raw/foo.org": {
           ingestedAt: "2026-04-12T00:00:00.000Z",
           contentHash: "sha256:abc",
-          wikiPages: ["20260412T100000"],
         },
       },
     };
@@ -36,12 +35,11 @@ describe("writeLockEntry", () => {
     mkdirSync(rawDir);
     writeFileSync(join(rawDir, "article.org"), "hello world");
 
-    writeLockEntry(TMP, "raw/article.org", ["20260412T100000"]);
+    writeLockEntry(TMP, "raw/article.org");
 
     const lock = readLock(TMP);
     expect(lock.files["raw/article.org"]).toMatchObject({
       contentHash: expect.stringMatching(/^sha256:[0-9a-f]{64}$/),
-      wikiPages: ["20260412T100000"],
     });
   });
 
@@ -49,13 +47,14 @@ describe("writeLockEntry", () => {
     const rawDir = join(TMP, "raw");
     mkdirSync(rawDir);
     writeFileSync(join(rawDir, "article.org"), "v1");
-    writeLockEntry(TMP, "raw/article.org", ["id1"]);
+    writeLockEntry(TMP, "raw/article.org");
+    const hash1 = readLock(TMP).files["raw/article.org"].contentHash;
 
     writeFileSync(join(rawDir, "article.org"), "v2");
-    writeLockEntry(TMP, "raw/article.org", ["id2"]);
+    writeLockEntry(TMP, "raw/article.org");
 
     const lock = readLock(TMP);
-    expect(lock.files["raw/article.org"].wikiPages).toEqual(["id2"]);
+    expect(lock.files["raw/article.org"].contentHash).not.toBe(hash1);
     expect(Object.keys(lock.files)).toHaveLength(1);
   });
 });

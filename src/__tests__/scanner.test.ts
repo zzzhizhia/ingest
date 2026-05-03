@@ -36,7 +36,6 @@ describe("scanPendingFiles", () => {
         "raw/clips/article.org": {
           ingestedAt: "2026-04-12T00:00:00.000Z",
           contentHash: "sha256:" + hash,
-          wikiPages: [],
         },
       },
     };
@@ -51,7 +50,6 @@ describe("scanPendingFiles", () => {
         "raw/clips/article.org": {
           ingestedAt: "2026-04-12T00:00:00.000Z",
           contentHash: "sha256:oldhash",
-          wikiPages: [],
         },
       },
     };
@@ -99,12 +97,10 @@ describe("scanPendingFiles", () => {
         "raw/b.md": {
           ingestedAt: "2026-04-12T00:00:00.000Z",
           contentHash: "sha256:stale",
-          wikiPages: [],
         },
         "raw/c.org": {
           ingestedAt: "2026-04-12T00:00:00.000Z",
           contentHash: "sha256:" + hashC,
-          wikiPages: [],
         },
       },
     };
