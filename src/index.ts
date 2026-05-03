@@ -120,6 +120,7 @@ ${pc.bold("Options")}
       --output P  output HTML path for export (full path)
       --output-root D  directory for export with auto Denote-style stem
       --open      open the exported HTML after writing it
+  -V, --version   show version and exit
   -h, --help      show this help and exit
 
 ${pc.bold("Flow")}
@@ -310,13 +311,7 @@ async function cmdQuery(positional: string[]): Promise<void> {
 }
 
 async function cmdExport(args: string[], positional: string[]): Promise<void> {
-  const orgRoot = findOrgRoot(process.cwd());
-  if (args.includes("--list")) {
-    listPages(orgRoot);
-    return;
-  }
-  const startId = positional[1];
-  if (!startId) {
+  if (!args.includes("--list") && !positional[1]) {
     console.error(
       pc.red("✗") +
         " usage: ingest export <id> [--depth N] [--backlinks] [--output PATH] [--open]",
@@ -324,6 +319,12 @@ async function cmdExport(args: string[], positional: string[]): Promise<void> {
     console.error(pc.dim("       ingest export --list   to list available IDs"));
     process.exit(1);
   }
+  const orgRoot = findOrgRoot(process.cwd());
+  if (args.includes("--list")) {
+    listPages(orgRoot);
+    return;
+  }
+  const startId = positional[1]!;
   const depthStr = getOpt(args, "--depth") ?? "1";
   const depth = Number.parseInt(depthStr, 10);
   if (!Number.isFinite(depth) || depth < 0) {
@@ -562,6 +563,11 @@ async function main(): Promise<void> {
 
   const args = process.argv.slice(2);
 
+  if (args.includes("--version") || args.includes("-V")) {
+    process.stdout.write(__VERSION__ + "\n");
+    return;
+  }
+
   if (args.includes("--help") || args.includes("-h")) {
     process.stdout.write(HELP);
     return;
@@ -571,7 +577,7 @@ async function main(): Promise<void> {
   const flags = args.filter((a) => a.startsWith("-"));
 
   const SUBCOMMANDS = new Set(["status", "init", "forget", "lint", "query", "export", "man"]);
-  const GLOBAL_FLAGS = new Set(["-a", "--all", "--verbose"]);
+  const GLOBAL_FLAGS = new Set(["-a", "--all", "--verbose", "-V", "--version"]);
   const EXPORT_FLAGS = new Set(["--depth", "--backlinks", "--output", "--output-root", "--open", "--list"]);
   const LINT_FLAGS = new Set(["--fix"]);
 

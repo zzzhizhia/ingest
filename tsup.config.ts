@@ -2,6 +2,7 @@ import { defineConfig } from "tsup";
 import { readFileSync } from "node:fs";
 
 const readme = readFileSync("README.md", "utf8");
+const { version } = JSON.parse(readFileSync("package.json", "utf8"));
 
 export default defineConfig({
   entry: ["src/index.ts"],
@@ -13,5 +14,6 @@ export default defineConfig({
   splitting: false,
   define: {
     __README__: JSON.stringify(readme),
+    __VERSION__: JSON.stringify(version),
   },
 });

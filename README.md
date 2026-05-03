@@ -2,6 +2,85 @@
 
 Interactive CLI for ingesting raw source files into an org-mode LLM wiki via `claude -p`. Supports standalone knowledge bases and git submodule knowledge bases with independent digestion.
 
+## Quick Start
+
+```bash
+# Install
+npm install -g @zzzhizhia/ingest
+
+# Scaffold a new wiki
+ingest init ./wiki
+cd wiki
+
+# Drop a file into raw/ and ingest it
+cp ~/notes/article.md raw/
+ingest
+```
+
+Or run directly without installing:
+
+```bash
+npx @zzzhizhia/ingest init ./wiki
+```
+
+### Requirements
+
+- Node >= 20
+- `claude` CLI in PATH ([install guide](https://docs.anthropic.com/en/docs/claude-code/overview))
+- LibreOffice (optional, for Office file conversion)
+- Whisper (optional, for audio transcription)
+- glow (optional, for rendered query output)
+
+## Usage
+
+```bash
+# Interactive checkbox -- select which pending files to ingest
+ingest
+
+# Ingest all pending files without prompting
+ingest --all
+
+# Ingest specific files directly (skips pending scan)
+ingest raw/clips/article.org
+
+# Show pending files, submodule grouping, and config
+ingest status
+
+# Scaffold a blank wiki (+ pre-commit hook if git repo)
+ingest init
+ingest init ./path/to/new-wiki
+
+# Remove a file from lock (makes it pending again for re-ingestion)
+ingest forget raw/clips/article.org
+
+# Validate wiki files (format, links, ID uniqueness)
+ingest lint
+
+# Validate + apply safe deterministic auto-fixes
+ingest lint --fix
+
+# Ask a question against the wiki via Claude
+ingest query "What do we know about X?"
+
+# Export a wiki page and its linked neighborhood as HTML
+ingest export <id> [--depth N] [--backlinks] [--output PATH] [--open]
+ingest export --list
+```
+
+## Options
+
+| Option | Description |
+|--------|-------------|
+| `-a`, `--all` | Ingest all pending files without prompting |
+| `-V`, `--version` | Show version and exit |
+| `--verbose` | Stream Claude output in real-time (default: spinner with elapsed time) |
+| `--depth N` | BFS hops for export (default 1) |
+| `--backlinks` | Include reverse links during BFS for export |
+| `--output P` | Output HTML path for export |
+| `--output-root D` | Directory for export with auto Denote-style filename |
+| `--open` | Open exported HTML in browser |
+| `--fix` | Apply safe auto-fixes (used with `lint`) |
+
 ## Knowledge Base Structure
 
 An ingest knowledge base is a git repository with this layout:
@@ -55,76 +134,15 @@ Claude Code provides terminal-based access to Claude...
 
 Key properties:
 
-- **:ID:** — Timestamp identifier (`YYYYMMDDTHHMMSS`), unique across all files
-- **:DATE:** — Creation date in `[YYYY-MM-DD]` format
-- **:SOURCES:** — Path to the raw source file that contributed this page
-- **Tag** — One of `:entity:`, `:concept:`, `:source:`, `:analysis:`, must match the file
-- **Cross-references** — Bidirectional `[[id:...][Title]]` links between pages
+- **:ID:** -- Timestamp identifier (`YYYYMMDDTHHMMSS`), unique across all files
+- **:DATE:** -- Creation date in `[YYYY-MM-DD]` format
+- **:SOURCES:** -- Path to the raw source file that contributed this page
+- **Tag** -- One of `:entity:`, `:concept:`, `:source:`, `:analysis:`, must match the file
+- **Cross-references** -- Bidirectional `[[id:...][Title]]` links between pages
 
-**Source files** under `raw/` are immutable — ingest never modifies them. They use [Denote naming](https://protesilaos.com/emacs/denote): `{YYYYMMDDTHHMMSS}--{title}__{tags}.ext`.
+**Source files** under `raw/` are immutable -- ingest never modifies them. They use [Denote naming](https://protesilaos.com/emacs/denote): `{YYYYMMDDTHHMMSS}--{title}__{tags}.ext`.
 
 **Submodule knowledge bases** under `subs/` are fully independent: own category files, own raw/, own git history. Useful for team/project wikis with different access permissions.
-
-## Install
-
-```bash
-npm install -g @zzzhizhia/ingest
-```
-
-Or run directly:
-
-```bash
-npx @zzzhizhia/ingest
-```
-
-## Usage
-
-```bash
-# Interactive checkbox — select which pending files to ingest
-ingest
-
-# Ingest all pending files without prompting
-ingest --all
-
-# Ingest specific files directly (skips pending scan)
-ingest raw/clips/article.org
-
-# Show pending files, submodule grouping, and config
-ingest status
-
-# Scaffold a blank wiki (+ pre-commit hook if git repo)
-ingest init
-ingest init ./path/to/new-wiki
-
-# Remove a file from lock (makes it pending again for re-ingestion)
-ingest forget raw/clips/article.org
-
-# Validate wiki files (format, links, ID uniqueness)
-ingest lint
-
-# Validate + apply safe deterministic auto-fixes
-ingest lint --fix
-
-# Ask a question against the wiki via Claude
-ingest query "What do we know about X?"
-
-# Export a wiki page and its linked neighborhood as HTML
-ingest export <id> [--depth N] [--backlinks] [--output PATH] [--open]
-ingest export --list
-```
-
-## Options
-
-| Option | Description |
-|--------|-------------|
-| `-a`, `--all` | Ingest all pending files without prompting |
-| `--verbose` | Stream Claude output in real-time (default: spinner with elapsed time) |
-| `--depth N` | BFS hops for export (default 1) |
-| `--backlinks` | Include reverse links during BFS for export |
-| `--output P` | Output HTML path for export |
-| `--output-root D` | Directory for export with auto Denote-style filename |
-| `--open` | Open exported HTML in browser |
-| `--fix` | Apply safe auto-fixes (used with `lint`) |
 
 ## Full Flow
 
@@ -236,7 +254,7 @@ The same validation runs as a pre-commit hook. If a commit is rejected during in
 
 ## What Claude Does
 
-Claude runs as `claude -p` with model and effort from `ingest.json`. Its instructions are embedded in the CLI — it does not read `CLAUDE.md`.
+Claude runs as `claude -p` with model and effort from `ingest.json`. Its instructions are embedded in the CLI -- it does not read `CLAUDE.md`.
 
 For each source file, Claude:
 
@@ -249,7 +267,7 @@ For each source file, Claude:
 
 After all files are processed, Claude appends an entry to `summary.org` log (main repo only; submodules skip this).
 
-Claude is **not** responsible for git commits or lock updates — the CLI handles both.
+Claude is **not** responsible for git commits or lock updates -- the CLI handles both.
 
 ### Allowed Tools
 
@@ -267,14 +285,6 @@ Configurable via `allowedTools` in `ingest.json`.
 ## Org Root Detection
 
 The CLI walks up from the current directory looking for `ingest-lock.json`. Run `ingest init` to scaffold a new wiki, or run from anywhere inside an existing one.
-
-## Requirements
-
-- Node >= 20
-- `claude` CLI in PATH
-- LibreOffice (optional, for Office file conversion)
-- Whisper (optional, for audio transcription)
-- glow (optional, for rendered query output)
 
 ## License
 
