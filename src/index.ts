@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import pc from "picocolors";
 import { invokeClaude, runClaude, runClaudeFix } from "./claude.js";
 import { readConfig } from "./config.js";
-import { convertOfficeToPdf, isAudioFile, isOfficeFile, transcribeAudio } from "./convert.js";
+import { convertOfficeToPdf, isOfficeFile } from "./convert.js";
 import { listPages, runExport } from "./export.js";
 import { runSafeFixes, type AppliedFix } from "./fix.js";
 import {
@@ -19,7 +19,7 @@ import {
   type CommitResult,
 } from "./git.js";
 import { lintWiki } from "./lint.js";
-import { renderWithGlow } from "./markdown.js";
+import { printMarkdown, renderWithGlow } from "./markdown.js";
 import { readLock, removeLockEntry, writeLockEntries } from "./lock.js";
 import { installPreCommitHook, scaffoldWiki } from "./init.js";
 import { scanPendingFiles, type PendingFile } from "./scanner.js";
@@ -62,21 +62,23 @@ function findOrgRoot(start: string): string {
 
 // ── interactive selection ─────────────────────────────────────────────────────
 
-function formatChoice(f: PendingFile) {
-  const badge = f.status === "new" ? pc.green("+") : pc.yellow("~");
-  return {
-    name: `${badge} ${pc.bold(f.rel)}\n  ${pc.dim(f.status === "new" ? "new" : "updated")}`,
-    value: f,
-    short: f.rel,
-  };
-}
-
 async function selectFiles(pending: PendingFile[]): Promise<PendingFile[]> {
+  const choices = pending.map((f) => {
+    const tag = f.status === "new" ? pc.green("[NEW]") : pc.yellow("[UPD]");
+    const scope = f.submoduleRoot ? pc.dim(` (${basename(f.submoduleRoot)})`) : "";
+    return { name: `${tag} ${f.rel}${scope}`, value: f };
+  });
   return withQuit(checkbox, {
     message: `Select files to ingest  ${pc.dim("(space: toggle, a: all, enter: confirm, q: quit)")}`,
-    choices: pending.map(formatChoice),
+    choices,
     pageSize: 25,
     loop: false,
+    theme: {
+      style: {
+        renderSelectedChoices: (selected: { short: string }[]) =>
+          "\n" + selected.map((c) => "  " + c.short).join("\n") + "\n",
+      },
+    },
   });
 }
 
@@ -305,14 +307,7 @@ async function cmdQuery(positional: string[]): Promise<void> {
     console.error(pc.red("✗") + " query failed");
     process.exit(1);
   }
-  const trimmed = result.output.trimEnd();
-  if (!trimmed) return;
-  if (process.stdout.isTTY) {
-    const rendered = await renderWithGlow(trimmed);
-    process.stdout.write(rendered);
-  } else {
-    process.stdout.write(trimmed + "\n");
-  }
+  await printMarkdown(result.output);
 }
 
 async function cmdExport(args: string[], positional: string[]): Promise<void> {
@@ -428,10 +423,7 @@ async function cmdIngest(args: string[]): Promise<void> {
       return;
     }
 
-    console.log(
-      pc.bold(`\n${pending.length} file(s) pending`) +
-        pc.dim("  (org: " + orgRoot + ")\n"),
-    );
+    console.log(pc.bold(`\n${pending.length} file(s) pending\n`));
 
     if (allFlag) {
       toIngest = pending;
@@ -442,6 +434,15 @@ async function cmdIngest(args: string[]): Promise<void> {
         return;
       }
     }
+  }
+
+  if (allFlag || explicitFiles.length > 0) {
+    for (const f of toIngest) {
+      const tag = f.status === "new" ? pc.green("[NEW]") : pc.yellow("[UPD]");
+      const scope = f.submoduleRoot ? pc.dim(` (${basename(f.submoduleRoot)})`) : "";
+      console.log(`  ${tag} ${f.rel}${scope}`);
+    }
+    console.log();
   }
 
   // ── group files by subwiki ──
@@ -457,7 +458,7 @@ async function cmdIngest(args: string[]): Promise<void> {
     }
   }
 
-  // ── pre-conversion (Office → PDF, audio → transcript) ──
+  // ── pre-conversion (Office → PDF) ──
   const convertedMap = new Map<string, string>();
   for (const f of toIngest) {
     if (isOfficeFile(f.rel)) {
@@ -465,26 +466,8 @@ async function cmdIngest(args: string[]): Promise<void> {
       const pdf = convertOfficeToPdf(orgRoot, f.rel);
       convertedMap.set(f.rel, pdf);
       process.stdout.write(`\r${pc.green("✓")} ${pc.dim(`converted → ${pdf}`)}\n`);
-    } else if (isAudioFile(f.rel)) {
-      process.stdout.write(pc.dim(`→ transcribing ${f.rel}...`));
-      const txt = transcribeAudio(orgRoot, f.rel);
-      convertedMap.set(f.rel, txt);
-      process.stdout.write(`\r${pc.green("✓")} ${pc.dim(`transcribed → ${txt}`)}\n`);
     }
   }
-
-  console.log();
-  console.log(
-    "─".repeat(60) + "\n" +
-    toIngest
-      .map((f, i) => {
-        const tag = f.status === "new" ? pc.green("[NEW]") : pc.yellow("[UPDATED]");
-        const scope = f.submoduleRoot ? pc.dim(` (${basename(f.submoduleRoot)})`) : "";
-        return pc.bold(`${i + 1}.`) + " " + tag + " " + f.rel + scope;
-      })
-      .join("\n") +
-    "\n\n" + pc.dim("Ingesting..."),
-  );
 
   // ── run Claude: main repo files ──
   if (mainFiles.length > 0) {
@@ -530,7 +513,7 @@ async function cmdIngest(args: string[]): Promise<void> {
   // ── push subwikis ──
   for (const smRoot of submoduleGroups.keys()) {
     try {
-      gitPush(smRoot);
+      gitPush(smRoot, basename(smRoot));
     } catch {
       console.warn(pc.yellow("⚠") + ` failed to push subwiki ${basename(smRoot)}`);
     }

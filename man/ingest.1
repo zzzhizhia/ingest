@@ -120,11 +120,6 @@ generates a starter config.
 .B Office
 \&.doc, .docx, .ppt, .pptx, .xls, .xlsx \(em pre-converted to PDF via LibreOffice
 .TP
-.B Image
-\&.png, .jpg, .jpeg, .webp, .gif \(em direct read via Claude vision
-.TP
-.B Audio
-\&.m4a, .mp3, .wav, .ogg \(em pre-transcribed via Whisper
 .SH WIKI STRUCTURE
 .PP
 Each org root contains four category files. Every top-level heading follows a template with :ID: (YYYYMMDDTHHMMSS), :DATE:, :SOURCES:, and a file-specific tag (:entity:, :concept:, :source:, :analysis:).
@@ -143,7 +138,7 @@ are independent knowledge bases with their own category files and raw/. Subwiki 
 git pull --ff-only (auto stash/pop)
 git submodule update --remote --init
 Scan raw/ + subs/ vs ingest-lock.json
-Pre-convert: Office -> PDF, audio -> text
+Pre-convert: Office -> PDF
 Interactive selection (or --all)
 Group by subwiki
 Claude sessions (main sequential, subs parallel)
@@ -195,14 +190,11 @@ Node >= 20,
 CLI in PATH. Optional:
 .BR LibreOffice
 (Office conversion),
-.BR whisper
-(audio transcription),
 .BR glow (1)
 (rendered output).
 .SH SEE ALSO
 .BR claude (1),
 .BR glow (1),
-.BR whisper (1),
 .BR soffice (1)
 .SH AUTHORS
 zzzhizhi

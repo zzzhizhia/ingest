@@ -65,18 +65,16 @@ describe("scanPendingFiles", () => {
     expect(scanPendingFiles(TMP, emptyLock())).toHaveLength(0);
   });
 
-  it("includes image files", () => {
+  it("ignores image files", () => {
     makeOrg(TMP, "raw/clips/photo.png", "binary");
     makeOrg(TMP, "raw/clips/diagram.jpg", "binary");
-    const results = scanPendingFiles(TMP, emptyLock());
-    expect(results).toHaveLength(2);
+    expect(scanPendingFiles(TMP, emptyLock())).toHaveLength(0);
   });
 
-  it("includes audio files", () => {
+  it("ignores audio files", () => {
     makeOrg(TMP, "raw/plaud/meeting.m4a", "binary");
     makeOrg(TMP, "raw/plaud/call.mp3", "binary");
-    const results = scanPendingFiles(TMP, emptyLock());
-    expect(results).toHaveLength(2);
+    expect(scanPendingFiles(TMP, emptyLock())).toHaveLength(0);
   });
 
   it("includes .pdf files", () => {

@@ -64,9 +64,10 @@ export function gitSubmoduleUpdate(orgRoot: string): void {
   process.stdout.write("\r" + pc.dim("↓ subwikis up to date") + "\n");
 }
 
-export function gitPush(orgRoot: string): void {
+export function gitPush(orgRoot: string, label?: string): void {
   execFileSync("git", ["push"], { cwd: orgRoot, stdio: "ignore" });
-  console.log(pc.dim("↑ pushed"));
+  const suffix = label ? ` (${label})` : "";
+  console.log(pc.dim(`↑ pushed${suffix}`));
 }
 
 function sourcePathsToAdd(orgRoot: string, files: string[]): string[] {

@@ -28,7 +28,7 @@ npx @zzzhizhia/ingest init ./wiki
 - Node >= 20
 - `claude` CLI in PATH ([install guide](https://docs.anthropic.com/en/docs/claude-code/overview))
 - LibreOffice (optional, for Office file conversion)
-- Whisper (optional, for audio transcription)
+
 - glow (optional, for rendered query output)
 
 ## Usage
@@ -153,7 +153,7 @@ git submodule update --remote --init
   ↓
 Scan raw/ + subs/ vs ingest-lock.json → find new + updated files
   ↓
-Pre-convert: Office → PDF (LibreOffice), audio → text (Whisper)
+Pre-convert: Office → PDF (LibreOffice)
   ↓
 Interactive checkbox (skipped with --all or explicit paths)
   ↓
@@ -193,8 +193,6 @@ All fields are optional. Missing fields use the defaults shown above. `ingest in
 | Text | `.org`, `.md`, `.txt` | Direct read |
 | PDF | `.pdf` | Direct read |
 | Office | `.doc`, `.docx`, `.ppt`, `.pptx`, `.xls`, `.xlsx` | Pre-converted to PDF via LibreOffice |
-| Image | `.png`, `.jpg`, `.jpeg`, `.webp`, `.gif` | Direct read via Claude vision |
-| Audio | `.m4a`, `.mp3`, `.wav`, `.ogg` | Pre-transcribed via Whisper |
 
 ## Subwiki Knowledge Bases
 
@@ -258,7 +256,7 @@ Claude runs as `claude -p` with model and effort from `ingest.json`. Its instruc
 
 For each source file, Claude:
 
-1. Reads the file (images via vision, audio via pre-transcription, Office via pre-conversion)
+1. Reads the file (Office files via pre-conversion to PDF)
 2. Checks for existing wiki pages (`grep SOURCES:` in wiki files)
 3. Extracts entities, concepts, and key arguments with section-level attribution
 4. Matches existing headings (fuzzy) or appends new ones

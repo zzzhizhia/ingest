@@ -42,6 +42,16 @@ function renderViaGlow(markdown: string, width: number): Promise<string> {
   });
 }
 
+export async function printMarkdown(text: string): Promise<void> {
+  const trimmed = text.trimEnd();
+  if (!trimmed) return;
+  if (process.stdout.isTTY) {
+    process.stdout.write(await renderWithGlow(trimmed));
+  } else {
+    process.stdout.write(trimmed + "\n");
+  }
+}
+
 export async function renderWithGlow(markdown: string, width?: number): Promise<string> {
   const w = width ?? Math.min(process.stdout.columns || 80, 100);
   if (isGlowAvailable()) {

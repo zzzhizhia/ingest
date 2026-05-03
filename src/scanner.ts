@@ -23,15 +23,6 @@ const SUPPORTED = new Set([
   ".pptx",
   ".xls",
   ".xlsx",
-  ".png",
-  ".jpg",
-  ".jpeg",
-  ".webp",
-  ".gif",
-  ".m4a",
-  ".mp3",
-  ".wav",
-  ".ogg",
 ]);
 
 const WIKI_FILES = new Set([

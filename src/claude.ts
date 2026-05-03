@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { basename } from "node:path";
 import pc from "picocolors";
 import type { IngestConfig } from "./config.js";
+import { printMarkdown } from "./markdown.js";
 import {
   buildFixPrompt,
   buildPrompt,
@@ -99,7 +100,7 @@ export async function invokeClaude(opts: ClaudeRunOpts): Promise<ClaudeResult> {
     process.on("SIGINT", onInterrupt);
     process.on("SIGTERM", onInterrupt);
 
-    child.on("close", (code) => {
+    child.on("close", async (code) => {
       process.off("SIGINT", onInterrupt);
       process.off("SIGTERM", onInterrupt);
 
@@ -113,17 +114,7 @@ export async function invokeClaude(opts: ClaudeRunOpts): Promise<ClaudeResult> {
         console.log(pc.dim("└" + "─".repeat(W) + "┘") + pc.dim(` ${elapsed}`));
       } else {
         process.stdout.write(`\r${pc.green("✓")} ${pc.dim(opts.label)} ${pc.dim(elapsed)}\n`);
-        const trimmed = output.trimEnd();
-        if (trimmed) {
-          const W = 60;
-          const header = `┌─ ${opts.label} `;
-          const padding = Math.max(0, W - header.length + 1);
-          console.log(pc.dim(header + "─".repeat(padding) + "┐"));
-          for (const line of trimmed.split("\n")) {
-            console.log(pc.dim("│ ") + line);
-          }
-          console.log(pc.dim("└" + "─".repeat(W) + "┘"));
-        }
+        await printMarkdown(output);
       }
 
       if (interrupted) {
@@ -154,7 +145,7 @@ export async function runClaude(
   verbose?: boolean,
 ): Promise<boolean> {
   const cwd = submoduleRoot ?? orgRoot;
-  const label = submoduleRoot ? `claude (${basename(submoduleRoot)})` : "claude";
+  const label = submoduleRoot ? basename(submoduleRoot) : "ingesting";
   const result = await invokeClaude({
     orgRoot: cwd,
     systemPrompt: submoduleRoot ? SUBMODULE_SYSTEM_PROMPT : SYSTEM_PROMPT,
