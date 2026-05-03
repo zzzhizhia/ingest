@@ -1,3 +1,5 @@
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { convertedPdfPath, isOfficeFile } from "../convert.js";
 
@@ -16,15 +18,17 @@ describe("isOfficeFile", () => {
 });
 
 describe("convertedPdfPath", () => {
-  it("replaces extension with .pdf under /tmp/ingest", () => {
+  const base = join(tmpdir(), "ingest");
+
+  it("replaces extension with .pdf under tmpdir/ingest", () => {
     expect(convertedPdfPath("raw/drafts/slides.pptx")).toBe(
-      "/tmp/ingest/raw/drafts/slides.pdf",
+      join(base, "raw/drafts/slides.pdf"),
     );
   });
 
   it("preserves directory structure", () => {
     expect(convertedPdfPath("raw/clips/sub/report.docx")).toBe(
-      "/tmp/ingest/raw/clips/sub/report.pdf",
+      join(base, "raw/clips/sub/report.pdf"),
     );
   });
 });

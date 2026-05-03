@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { basename, dirname, extname, join } from "node:path";
 
 const OFFICE_EXT = new Set([
@@ -15,7 +16,7 @@ const AUDIO_EXT = new Set([".m4a", ".mp3", ".wav", ".ogg"]);
 
 const IMAGE_EXT = new Set([".png", ".jpg", ".jpeg", ".webp", ".gif"]);
 
-const CONVERT_DIR = "/tmp/ingest";
+const CONVERT_DIR = join(tmpdir(), "ingest");
 
 export function isOfficeFile(rel: string): boolean {
   return OFFICE_EXT.has(extname(rel).toLowerCase());
@@ -94,19 +95,29 @@ function findWhisper(): string {
 }
 
 function findSoffice(): string {
-  const macPath = "/Applications/LibreOffice.app/Contents/MacOS/soffice";
-  if (existsSync(macPath)) return macPath;
+  const knownPaths = [
+    "/Applications/LibreOffice.app/Contents/MacOS/soffice",
+    "C:\\Program Files\\LibreOffice\\program\\soffice.exe",
+    "C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe",
+  ];
+  for (const p of knownPaths) {
+    if (existsSync(p)) return p;
+  }
 
+  const whichCmd = process.platform === "win32" ? "where" : "which";
   for (const cmd of ["soffice", "libreoffice"]) {
     try {
-      execFileSync("which", [cmd], { stdio: "pipe" });
+      execFileSync(whichCmd, [cmd], { stdio: "pipe" });
       return cmd;
     } catch {
       // not in PATH
     }
   }
 
-  throw new Error(
-    "LibreOffice not found. Install it:\n  brew install --cask libreoffice",
-  );
+  const hint = process.platform === "darwin"
+    ? "brew install --cask libreoffice"
+    : process.platform === "win32"
+      ? "winget install TheDocumentFoundation.LibreOffice"
+      : "sudo apt install libreoffice";
+  throw new Error(`LibreOffice not found. Install it:\n  ${hint}`);
 }
