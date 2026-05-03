@@ -248,6 +248,12 @@ export function scaffoldWiki(dir: string): ScaffoldResult {
     created.push("raw/example-ingest-readme.md");
   }
 
+  const lockPath = join(dir, ".ingest-lock.json");
+  if (!existsSync(lockPath)) {
+    writeFileSync(lockPath, JSON.stringify({ version: 1, files: {} }, null, 2) + "\n");
+    created.push(".ingest-lock.json");
+  }
+
   return { dir, created, skipped };
 }
 

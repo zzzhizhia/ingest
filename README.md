@@ -91,6 +91,7 @@ entities.org
 concepts.org
 sources.org
 analyses.org
+.ingest-lock.json
 raw/
   example-ingest-readme.md
 subs/
@@ -151,14 +152,12 @@ If a commit is rejected, ingest retries with two fix stages: deterministic safe 
 
 ## Org Root Detection
 
-The CLI walks up from the current directory looking for a folder that contains both `raw/` and `CLAUDE.md`. Run from anywhere inside your org repo.
+The CLI walks up from the current directory looking for `.ingest-lock.json`. Run `ingest init` to scaffold a new wiki, or run from anywhere inside an existing one.
 
 ## Requirements
 
 - Node >= 20
 - `claude` CLI in PATH — install via `npm install -g @anthropic-ai/claude-code`
-- An org repo with `raw/` directory, `CLAUDE.md`, and `.ingest-lock.json` at the root
-  (`.ingest-lock.json` is created automatically on first run if missing)
 
 ## License
 

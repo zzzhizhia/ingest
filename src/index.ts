@@ -34,14 +34,14 @@ function withQuit<C, T>(
 function findOrgRoot(start: string): string {
   let dir = resolve(start);
   while (true) {
-    if (existsSync(join(dir, "raw")) && existsSync(join(dir, "CLAUDE.md"))) {
+    if (existsSync(join(dir, ".ingest-lock.json"))) {
       return dir;
     }
     const parent = resolve(dir, "..");
     if (parent === dir) {
       throw new Error(
-        "Could not find org root (directory with raw/ and CLAUDE.md). " +
-          "Run org-ingest from inside your org directory.",
+        "Could not find org root (directory with .ingest-lock.json). " +
+          "Run 'ingest init' to scaffold a new wiki.",
       );
     }
     dir = parent;
@@ -614,7 +614,7 @@ ${pc.bold("Flow")}
   claude -p --model sonnet (single session for all selected files)
   write .ingest-lock.json + git commit (with safe fix + LLM fix retry) + git push
 
-Org root is detected by walking up for a dir containing ${pc.cyan("raw/")} and ${pc.cyan("CLAUDE.md")}.
+Org root is detected by walking up for a dir containing ${pc.cyan(".ingest-lock.json")}.
 `;
 
 function reportSafeFixes(applied: AppliedFix[]): void {
