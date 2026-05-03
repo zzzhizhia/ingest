@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.1.1] - 2026-05-04
+
+### Removed
+
+- Image and audio file support (`.png`, `.jpg`, `.gif`, `.m4a`, `.mp3`, `.wav`, `.ogg`)
+
+### Changed
+
+- Claude output rendered via glow instead of box borders
+- Deduplicated file list display: checkbox shows tagged list once
+- Spinner label: "ingesting" while running, "ingested" on completion
+- Subwiki push output labeled with subwiki name
+- Extracted `printMarkdown` as shared rendering helper
+
 ## [1.1.0] - 2026-05-03
 
 ### Added
