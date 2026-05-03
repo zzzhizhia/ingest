@@ -110,6 +110,7 @@ ${pc.bold("Usage")}
   ingest query <question>    ask a question against the wiki via Claude
   ingest export <id>         render id + linked neighborhood as one HTML
   ingest export --list       list all wiki pages (id, category, title)
+  ingest man                 show full manual
 
 ${pc.bold("Options")}
   -a, --all       ingest all pending files without prompting
@@ -145,6 +146,15 @@ function reportSafeFixes(applied: AppliedFix[]): void {
 }
 
 // ── subcommands ───────────────────────────────────────────────────────────────
+
+async function cmdMan(): Promise<void> {
+  if (process.stdout.isTTY) {
+    const rendered = await renderWithGlow(__README__);
+    process.stdout.write(rendered);
+  } else {
+    process.stdout.write(__README__);
+  }
+}
 
 function cmdStatus(): void {
   const orgRoot = findOrgRoot(process.cwd());
@@ -560,11 +570,12 @@ async function main(): Promise<void> {
   const positional = args.filter((a) => !a.startsWith("-"));
   const flags = args.filter((a) => a.startsWith("-"));
 
-  const SUBCOMMANDS = new Set(["status", "init", "forget", "lint", "query", "export"]);
+  const SUBCOMMANDS = new Set(["status", "init", "forget", "lint", "query", "export", "man"]);
   const GLOBAL_FLAGS = new Set(["-a", "--all", "--verbose"]);
   const EXPORT_FLAGS = new Set(["--depth", "--backlinks", "--output", "--output-root", "--open", "--list"]);
   const LINT_FLAGS = new Set(["--fix"]);
 
+  if (positional[0] === "man") return cmdMan();
   if (positional[0] === "status") return cmdStatus();
   if (positional[0] === "init") return cmdInit(positional);
   if (positional[0] === "forget") return cmdForget(positional);
