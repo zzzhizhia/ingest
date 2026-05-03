@@ -220,8 +220,6 @@ export type ScaffoldResult = {
 
 export function scaffoldWiki(dir: string): ScaffoldResult {
   mkdirSync(dir, { recursive: true });
-  const rawDir = join(dir, "raw");
-  mkdirSync(rawDir, { recursive: true });
 
   const created: string[] = [];
   const skipped: string[] = [];
@@ -236,10 +234,12 @@ export function scaffoldWiki(dir: string): ScaffoldResult {
     }
   }
 
-  const gitkeep = join(rawDir, ".gitkeep");
-  if (!existsSync(gitkeep)) {
-    writeFileSync(gitkeep, "");
-    created.push("raw/.gitkeep");
+  for (const d of ["raw", "subs"]) {
+    const p = join(dir, d);
+    if (!existsSync(p)) {
+      mkdirSync(p);
+      created.push(d + "/");
+    }
   }
 
   return { dir, created, skipped };
