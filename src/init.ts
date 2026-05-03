@@ -254,6 +254,12 @@ export function scaffoldWiki(dir: string): ScaffoldResult {
     created.push(".ingest-lock.json");
   }
 
+  const gitignorePath = join(dir, ".gitignore");
+  if (!existsSync(gitignorePath)) {
+    writeFileSync(gitignorePath, ".DS_Store\n*~\n\\#*\\#\n.#*\n.claude/\n");
+    created.push(".gitignore");
+  }
+
   return { dir, created, skipped };
 }
 
