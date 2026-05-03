@@ -1,5 +1,6 @@
 import {
   chmodSync,
+  existsSync,
   lstatSync,
   mkdirSync,
   readFileSync,
@@ -202,6 +203,46 @@ function lexists(p: string): boolean {
   } catch {
     return false;
   }
+}
+
+const WIKI_CATEGORY_FILES = [
+  "entities.org",
+  "concepts.org",
+  "sources.org",
+  "analyses.org",
+];
+
+export type ScaffoldResult = {
+  dir: string;
+  created: string[];
+  skipped: string[];
+};
+
+export function scaffoldWiki(dir: string): ScaffoldResult {
+  mkdirSync(dir, { recursive: true });
+  const rawDir = join(dir, "raw");
+  mkdirSync(rawDir, { recursive: true });
+
+  const created: string[] = [];
+  const skipped: string[] = [];
+
+  for (const f of WIKI_CATEGORY_FILES) {
+    const p = join(dir, f);
+    if (existsSync(p)) {
+      skipped.push(f);
+    } else {
+      writeFileSync(p, "");
+      created.push(f);
+    }
+  }
+
+  const gitkeep = join(rawDir, ".gitkeep");
+  if (!existsSync(gitkeep)) {
+    writeFileSync(gitkeep, "");
+    created.push("raw/.gitkeep");
+  }
+
+  return { dir, created, skipped };
 }
 
 export function installPreCommitHook(orgRoot: string): InstallResult {

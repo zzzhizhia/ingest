@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import pc from "picocolors";
 import { listPages, runExport } from "./export.js";
 import { runSafeFixes, type AppliedFix } from "./fix.js";
-import { installPreCommitHook } from "./init.js";
+import { installPreCommitHook, scaffoldWiki } from "./init.js";
 import { readLock, writeLockEntry } from "./lock.js";
 import { convertOfficeToPdf, isOfficeFile } from "./convert.js";
 import { extractReferencedFiles } from "./references.js";
@@ -590,7 +590,9 @@ ${pc.bold("Usage")}
   ingest                     interactive checkbox of pending files
   ingest --all               ingest every pending file, no prompt
   ingest <path> [path ...]   ingest specific files directly
-  ingest init                install/refresh .git/hooks/pre-commit
+  ingest init                install pre-commit hook (in org root)
+  ingest init                scaffold blank wiki (outside org root)
+  ingest init <path>         scaffold blank wiki at <path>
   ingest --fix               apply safe auto-fixes to wiki files (no ingest)
   ingest export <id>         render id + linked neighborhood as one HTML
   ingest export --list       list all wiki pages (id, category, title)
@@ -652,9 +654,54 @@ async function main(): Promise<void> {
     return;
   }
 
-  const orgRoot = findOrgRoot(process.cwd());
-
   const positional = args.filter((a) => !a.startsWith("-"));
+
+  // Handle `init` before findOrgRoot — it may create a new wiki in a
+  // directory that has no org root yet.
+  if (positional[0] === "init") {
+    const target = positional[1];
+    if (target) {
+      const result = scaffoldWiki(resolve(target));
+      console.log(pc.green("✓") + " created wiki at " + pc.cyan(result.dir));
+      for (const f of result.created) console.log(pc.dim("  + " + f));
+      for (const f of result.skipped) console.log(pc.dim("  · " + f + " (exists)"));
+      return;
+    }
+
+    let orgRoot: string | null = null;
+    try { orgRoot = findOrgRoot(process.cwd()); } catch {}
+
+    if (orgRoot) {
+      const result = installPreCommitHook(orgRoot);
+      switch (result.action) {
+        case "wrote":
+          console.log(pc.green("✓") + " installed " + pc.cyan(result.path));
+          break;
+        case "skipped":
+          console.log(pc.green("✓") + " " + pc.cyan(result.path) + " already up to date");
+          break;
+        case "replaced-symlink":
+          console.log(
+            pc.green("✓") + " replaced symlink with regular file at " + pc.cyan(result.path),
+          );
+          break;
+        case "replaced-and-backed-up":
+          console.log(
+            pc.green("✓") + " installed " + pc.cyan(result.path) +
+              pc.dim(`  (previous content backed up to ${result.backupPath})`),
+          );
+          break;
+      }
+    } else {
+      const result = scaffoldWiki(process.cwd());
+      console.log(pc.green("✓") + " created wiki at " + pc.cyan(result.dir));
+      for (const f of result.created) console.log(pc.dim("  + " + f));
+      for (const f of result.skipped) console.log(pc.dim("  · " + f + " (exists)"));
+    }
+    return;
+  }
+
+  const orgRoot = findOrgRoot(process.cwd());
 
   if (positional[0] === "export") {
     if (args.includes("--list")) {
@@ -702,29 +749,6 @@ async function main(): Promise<void> {
     return;
   }
 
-  if (positional[0] === "init") {
-    const result = installPreCommitHook(orgRoot);
-    switch (result.action) {
-      case "wrote":
-        console.log(pc.green("✓") + " installed " + pc.cyan(result.path));
-        break;
-      case "skipped":
-        console.log(pc.green("✓") + " " + pc.cyan(result.path) + " already up to date");
-        break;
-      case "replaced-symlink":
-        console.log(
-          pc.green("✓") + " replaced symlink with regular file at " + pc.cyan(result.path),
-        );
-        break;
-      case "replaced-and-backed-up":
-        console.log(
-          pc.green("✓") + " installed " + pc.cyan(result.path) +
-            pc.dim(`  (previous content backed up to ${result.backupPath})`),
-        );
-        break;
-    }
-    return;
-  }
 
   if (args.includes("--fix")) {
     const result = runSafeFixes(orgRoot);
