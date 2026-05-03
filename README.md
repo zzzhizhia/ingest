@@ -7,7 +7,7 @@ Interactive CLI for ingesting raw source files into an org-mode LLM wiki via `cl
 An ingest knowledge base is a git repository with this layout:
 
 ```
-my-wiki/
+wiki/
 ├── entities.org          ← People, organizations, products, places
 ├── concepts.org          ← Ideas, theories, frameworks, methods
 ├── sources.org           ← One summary per ingested source file
