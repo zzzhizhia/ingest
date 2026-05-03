@@ -220,7 +220,7 @@ This directory is an org-mode knowledge base managed by [ingest](https://github.
 ├── sources.org         ← Source summaries: one page per ingested source file
 ├── analyses.org        ← Analyses: comparisons, syntheses, deep dives
 ├── raw/                ← Immutable source material (ingested by \`ingest\` CLI)
-├── subs/               ← Git submodule knowledge bases
+├── subs/               ← Subwiki knowledge bases
 ├── ingest-lock.json    ← Digestion state (path → content hash + timestamp)
 └── CLAUDE.md           ← This file
 \`\`\`

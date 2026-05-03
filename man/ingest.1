@@ -17,7 +17,7 @@ and
 , invokes Claude to extract structured knowledge, and writes it into org-mode wiki category files
 .RB ( entities.org ", " concepts.org ", " sources.org ", " analyses.org ).
 .PP
-The CLI handles git operations (pull, commit, push), lock file tracking, pre-commit validation, and submodule knowledge base independence.
+The CLI handles git operations (pull, commit, push), lock file tracking, pre-commit validation, and subwiki knowledge base independence.
 .SH COMMANDS
 .TP
 .B ingest
@@ -30,7 +30,7 @@ Ingest all pending files without prompting.
 Ingest specific files directly.
 .TP
 .B ingest status
-Show pending files (new + updated), submodule grouping, and current config.
+Show pending files (new + updated), subwiki grouping, and current config.
 .TP
 .BI "ingest init [" path ]
 Scaffold a blank wiki template. Creates category files, ingest-lock.json, ingest.json, raw/, subs/, .gitignore, .gitattributes, and CLAUDE.md. Installs pre-commit hook if target is a git repository.
@@ -132,11 +132,11 @@ Each org root contains four category files. Every top-level heading follows a te
 Cross-references use org-id links:
 .BR [[id:YYYYMMDDTHHMMSS][Title]] .
 Links must be bidirectional.
-.SH SUBMODULES
+.SH SUBWIKIS
 .PP
-Git submodules under
+Subwikis under
 .B subs/
-are independent knowledge bases with their own category files and raw/. Submodule Claude sessions run in parallel. Commits happen inside each submodule first, then the main repo commits submodule pointer updates.
+are independent knowledge bases with their own category files and raw/. Subwiki Claude sessions run in parallel. Commits happen inside each subwiki first, then the main repo commits subwiki pointer updates.
 .SH INGESTION FLOW
 .PP
 .nf
@@ -145,10 +145,10 @@ git submodule update --remote --init
 Scan raw/ + subs/ vs ingest-lock.json
 Pre-convert: Office -> PDF, audio -> text
 Interactive selection (or --all)
-Group by submodule
+Group by subwiki
 Claude sessions (main sequential, subs parallel)
 Write ingest-lock.json (batch)
-Commit submodules + push
+Commit subwikis + push
 Commit main repo + push
 .fi
 .SH ORG ROOT DETECTION

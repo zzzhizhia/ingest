@@ -42,17 +42,14 @@ const WIKI_FILES = new Set([
 ]);
 
 function* walkDir(dir: string, submoduleRoot?: string): Generator<{ abs: string; submoduleRoot?: string }> {
-  const isSubmodule = existsSync(join(dir, ".git"));
-  const currentSubmodule = isSubmodule ? dir : submoduleRoot;
-
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const full = join(dir, entry.name);
     if (entry.isDirectory()) {
-      yield* walkDir(full, currentSubmodule);
+      yield* walkDir(full, submoduleRoot);
     } else if (entry.isFile()) {
-      if (isSubmodule && WIKI_FILES.has(entry.name)) continue;
+      if (submoduleRoot && WIKI_FILES.has(entry.name)) continue;
       const ext = extname(entry.name).toLowerCase();
-      if (SUPPORTED.has(ext)) yield { abs: full, submoduleRoot: currentSubmodule };
+      if (SUPPORTED.has(ext)) yield { abs: full, submoduleRoot };
     }
   }
 }
@@ -64,12 +61,21 @@ export function scanPendingFiles(
   const locked = lock.files ?? {};
   const results: PendingFile[] = [];
 
-  const scanRoots = [join(orgRoot, "raw")];
+  const scanRoots: Array<{ dir: string; subwikiRoot?: string }> = [
+    { dir: join(orgRoot, "raw") },
+  ];
   const subsDir = join(orgRoot, "subs");
-  if (existsSync(subsDir)) scanRoots.push(subsDir);
+  if (existsSync(subsDir)) {
+    for (const entry of readdirSync(subsDir, { withFileTypes: true })) {
+      if (entry.isDirectory()) {
+        const full = join(subsDir, entry.name);
+        scanRoots.push({ dir: full, subwikiRoot: full });
+      }
+    }
+  }
 
   const entries = scanRoots
-    .flatMap((root) => [...walkDir(root)])
+    .flatMap((root) => [...walkDir(root.dir, root.subwikiRoot)])
     .sort((a, b) => a.abs.localeCompare(b.abs));
 
   for (const { abs, submoduleRoot } of entries) {

@@ -54,14 +54,14 @@ export function gitPull(orgRoot: string): void {
 }
 
 export function gitSubmoduleUpdate(orgRoot: string): void {
-  process.stdout.write(pc.dim("↓ updating submodules..."));
+  process.stdout.write(pc.dim("↓ updating subwikis..."));
   const result = spawnSync(
     "git",
     ["submodule", "update", "--remote", "--init"],
     { cwd: orgRoot, encoding: "utf8" },
   );
-  if (result.status !== 0) throw new Error(result.stderr?.trim() ?? "git submodule update failed");
-  process.stdout.write("\r" + pc.dim("↓ submodules up to date") + "\n");
+  if (result.status !== 0) throw new Error(result.stderr?.trim() ?? "git subwiki update failed");
+  process.stdout.write("\r" + pc.dim("↓ subwikis up to date") + "\n");
 }
 
 export function gitPush(orgRoot: string): void {

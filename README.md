@@ -1,6 +1,6 @@
 # ingest
 
-Interactive CLI for ingesting raw source files into an org-mode LLM wiki via `claude -p`. Supports standalone knowledge bases and git submodule knowledge bases with independent digestion.
+Interactive CLI for ingesting raw source files into an org-mode LLM wiki via `claude -p`. Supports standalone knowledge bases and subwiki knowledge bases with independent digestion.
 
 ## Quick Start
 
@@ -43,7 +43,7 @@ ingest --all
 # Ingest specific files directly (skips pending scan)
 ingest raw/clips/article.org
 
-# Show pending files, submodule grouping, and config
+# Show pending files, subwiki grouping, and config
 ingest status
 
 # Scaffold a blank wiki (+ pre-commit hook if git repo)
@@ -98,7 +98,7 @@ wiki/
 │   ├── papers/           ←   Academic papers (.pdf)
 │   ├── plaud/            ←   Audio transcripts
 │   └── assets/           ←   Images, diagrams
-├── subs/                 ← Git submodule knowledge bases
+├── subs/                 ← Subwiki knowledge bases
 │   ├── team-wiki/        ←   Each with its own entities/concepts/sources/analyses.org
 │   └── project-wiki/
 ├── ingest-lock.json      ← Digestion state (path → content hash + timestamp)
@@ -142,7 +142,7 @@ Key properties:
 
 **Source files** under `raw/` are immutable -- ingest never modifies them. They use [Denote naming](https://protesilaos.com/emacs/denote): `{YYYYMMDDTHHMMSS}--{title}__{tags}.ext`.
 
-**Submodule knowledge bases** under `subs/` are fully independent: own category files, own raw/, own git history. Useful for team/project wikis with different access permissions.
+**Subwiki knowledge bases** under `subs/` are fully independent: own category files, own raw/, own git history. Useful for team/project wikis with different access permissions.
 
 ## Full Flow
 
@@ -157,15 +157,15 @@ Pre-convert: Office → PDF (LibreOffice), audio → text (Whisper)
   ↓
 Interactive checkbox (skipped with --all or explicit paths)
   ↓
-Group files by submodule
+Group files by subwiki
   ↓
-Claude sessions (main repo sequential, submodules parallel)
+Claude sessions (main repo sequential, subwikis parallel)
   ↓
 Write lock entries to ingest-lock.json (batch)
   ↓
-Commit submodules first + push
+Commit subwikis first + push
   ↓
-Commit main repo (wiki files + lock + submodule pointers) + push
+Commit main repo (wiki files + lock + subwiki pointers) + push
 ```
 
 ## Config
@@ -196,18 +196,18 @@ All fields are optional. Missing fields use the defaults shown above. `ingest in
 | Image | `.png`, `.jpg`, `.jpeg`, `.webp`, `.gif` | Direct read via Claude vision |
 | Audio | `.m4a`, `.mp3`, `.wav`, `.ogg` | Pre-transcribed via Whisper |
 
-## Submodule Knowledge Bases
+## Subwiki Knowledge Bases
 
-Git submodules under `subs/` are treated as independent knowledge bases. Each submodule has its own `entities.org`, `concepts.org`, `sources.org`, `analyses.org`, and `raw/`.
+Subwikis under `subs/` are treated as independent knowledge bases. Each subwiki has its own `entities.org`, `concepts.org`, `sources.org`, `analyses.org`, and `raw/`.
 
-When ingest finds source files inside a submodule, it:
+When ingest finds source files inside a subwiki, it:
 
-1. Invokes Claude with the submodule root as working directory
-2. Claude writes wiki pages to the submodule's own category files
-3. Commits inside the submodule, then pushes
-4. Main repo commits the submodule pointer update + lock
+1. Invokes Claude with the subwiki root as working directory
+2. Claude writes wiki pages to the subwiki's own category files
+3. Commits inside the subwiki, then pushes
+4. Main repo commits the subwiki pointer update + lock
 
-Submodule Claude sessions run in parallel. Submodule wiki files at the root level are skipped during scanning.
+Subwiki Claude sessions run in parallel. Subwiki wiki files at the root level are skipped during scanning.
 
 ## Scaffolding
 
@@ -265,7 +265,7 @@ For each source file, Claude:
 5. Writes pages following the org-mode wiki template, with source citations and confidence levels (`HIGH` / `MED` / `LOW`)
 6. Flags contradictions between new content and existing wiki pages
 
-After all files are processed, Claude appends an entry to `summary.org` log (main repo only; submodules skip this).
+After all files are processed, Claude appends an entry to `summary.org` log (main repo only; subwikis skip this).
 
 Claude is **not** responsible for git commits or lock updates -- the CLI handles both.
 

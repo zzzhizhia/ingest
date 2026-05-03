@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - `ingest export` for HTML rendering with SPA navigation
 - `ingest forget` to re-queue files for ingestion
 - `ingest man` for terminal-rendered manual
-- Git submodule knowledge bases with parallel ingestion
+- Subwiki knowledge bases with parallel ingestion
 - Pre-conversion: Office to PDF (LibreOffice), audio to text (Whisper)
 - Pre-commit hook for wiki validation
 - `ingest.json` config for model, effort, and allowed tools

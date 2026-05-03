@@ -23,6 +23,7 @@ import { renderWithGlow } from "./markdown.js";
 import { readLock, removeLockEntry, writeLockEntries } from "./lock.js";
 import { installPreCommitHook, scaffoldWiki } from "./init.js";
 import { scanPendingFiles, type PendingFile } from "./scanner.js";
+import { cmdSubAdd, cmdSubList, cmdSubNew, cmdSubRemove } from "./sub.js";
 
 // ── withQuit ──────────────────────────────────────────────────────────────────
 
@@ -108,6 +109,10 @@ ${pc.bold("Usage")}
   ingest lint                validate wiki files (format, links, IDs)
   ingest lint [--fix]        validate wiki files [+ apply safe auto-fixes]
   ingest query <question>    ask a question against the wiki via Claude
+  ingest sub                 list subwikis
+  ingest sub add <url> [n]   add remote repo as subwiki
+  ingest sub new <name>      create a new local subwiki
+  ingest sub remove <n> ...  remove subwiki(s)
   ingest export <id>         render id + linked neighborhood as one HTML
   ingest export --list       list all wiki pages (id, category, title)
   ingest man                 show full manual
@@ -185,7 +190,7 @@ function cmdStatus(): void {
   const smCount = new Set(pending.filter((f) => f.submoduleRoot).map((f) => f.submoduleRoot)).size;
   const mainCount = pending.filter((f) => !f.submoduleRoot).length;
   if (smCount > 0) {
-    console.log(pc.dim(`\n${smCount} submodule(s), ${mainCount} main-repo file(s)`));
+    console.log(pc.dim(`\n${smCount} subwiki(s), ${mainCount} main-repo file(s)`));
   }
   console.log(pc.dim(`model: ${config.model}, effort: ${config.effort}`));
 }
@@ -356,6 +361,44 @@ async function cmdExport(args: string[], positional: string[]): Promise<void> {
   }
 }
 
+function cmdSub(positional: string[]): void {
+  const sub = positional[1];
+  const orgRoot = findOrgRoot(process.cwd());
+
+  if (!sub || sub === "list") return cmdSubList(orgRoot);
+
+  if (sub === "add") {
+    const url = positional[2];
+    if (!url) {
+      console.error(pc.red("✗") + " usage: ingest sub add <url> [name]");
+      process.exit(1);
+    }
+    return cmdSubAdd(orgRoot, url, positional[3]);
+  }
+
+  if (sub === "new") {
+    const name = positional[2];
+    if (!name) {
+      console.error(pc.red("✗") + " usage: ingest sub new <name>");
+      process.exit(1);
+    }
+    return cmdSubNew(orgRoot, name);
+  }
+
+  if (sub === "remove") {
+    const names = positional.slice(2);
+    if (names.length === 0) {
+      console.error(pc.red("✗") + " usage: ingest sub remove <name> [name ...]");
+      process.exit(1);
+    }
+    return cmdSubRemove(orgRoot, names);
+  }
+
+  console.error(pc.red("✗") + ` unknown sub command: ${sub}`);
+  console.error(pc.dim("  available: list, add, new, remove"));
+  process.exit(1);
+}
+
 // ── main ingest flow ──────────────────────────────────────────────────────────
 
 async function cmdIngest(args: string[]): Promise<void> {
@@ -401,7 +444,7 @@ async function cmdIngest(args: string[]): Promise<void> {
     }
   }
 
-  // ── group files by submodule ──
+  // ── group files by subwiki ──
   const mainFiles: PendingFile[] = [];
   const submoduleGroups = new Map<string, PendingFile[]>();
   for (const f of toIngest) {
@@ -452,7 +495,7 @@ async function cmdIngest(args: string[]): Promise<void> {
     }
   }
 
-  // ── run Claude: submodule files (parallel across submodules) ──
+  // ── run Claude: subwiki files (parallel across subwikis) ──
   if (submoduleGroups.size > 0) {
     const results = await Promise.all(
       [...submoduleGroups.entries()].map(async ([smRoot, smFiles]) => {
@@ -471,12 +514,12 @@ async function cmdIngest(args: string[]): Promise<void> {
   // ── lock ──
   writeLockEntries(orgRoot, toIngest.map((f) => f.rel));
 
-  // ── commit submodules first ──
+  // ── commit subwikis first ──
   const committedSubmodules: string[] = [];
   for (const [smRoot, smFiles] of submoduleGroups) {
     const smResult = commitSubmodule(smRoot, smFiles);
     if (!smResult.ok) {
-      console.warn(pc.yellow("⚠") + ` submodule commit failed (${basename(smRoot)}): ${smResult.error}`);
+      console.warn(pc.yellow("⚠") + ` subwiki commit failed (${basename(smRoot)}): ${smResult.error}`);
     } else {
       const rel = basename(smRoot);
       const subPath = join("subs", rel);
@@ -484,12 +527,12 @@ async function cmdIngest(args: string[]): Promise<void> {
     }
   }
 
-  // ── push submodules ──
+  // ── push subwikis ──
   for (const smRoot of submoduleGroups.keys()) {
     try {
       gitPush(smRoot);
     } catch {
-      console.warn(pc.yellow("⚠") + ` failed to push submodule ${basename(smRoot)}`);
+      console.warn(pc.yellow("⚠") + ` failed to push subwiki ${basename(smRoot)}`);
     }
   }
 
@@ -576,7 +619,7 @@ async function main(): Promise<void> {
   const positional = args.filter((a) => !a.startsWith("-"));
   const flags = args.filter((a) => a.startsWith("-"));
 
-  const SUBCOMMANDS = new Set(["status", "init", "forget", "lint", "query", "export", "man"]);
+  const SUBCOMMANDS = new Set(["status", "init", "forget", "lint", "query", "export", "sub", "man"]);
   const GLOBAL_FLAGS = new Set(["-a", "--all", "--verbose", "-V", "--version"]);
   const EXPORT_FLAGS = new Set(["--depth", "--backlinks", "--output", "--output-root", "--open", "--list"]);
   const LINT_FLAGS = new Set(["--fix"]);
@@ -588,6 +631,7 @@ async function main(): Promise<void> {
   if (positional[0] === "lint") return cmdLint(args);
   if (positional[0] === "query") return cmdQuery(positional);
   if (positional[0] === "export") return cmdExport(args, positional);
+  if (positional[0] === "sub") return cmdSub(positional);
 
   if (positional[0] && !SUBCOMMANDS.has(positional[0]) && !existsSync(positional[0])) {
     console.error(pc.red("✗") + ` unknown command: ${positional[0]}`);
