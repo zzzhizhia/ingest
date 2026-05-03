@@ -590,9 +590,8 @@ ${pc.bold("Usage")}
   ingest                     interactive checkbox of pending files
   ingest --all               ingest every pending file, no prompt
   ingest <path> [path ...]   ingest specific files directly
-  ingest init                install pre-commit hook (in org root)
-  ingest init                scaffold blank wiki (outside org root)
-  ingest init <path>         scaffold blank wiki at <path>
+  ingest status              show pending files (new + updated)
+  ingest init [path]         scaffold blank wiki (+ pre-commit hook if git repo)
   ingest --fix               apply safe auto-fixes to wiki files (no ingest)
   ingest export <id>         render id + linked neighborhood as one HTML
   ingest export --list       list all wiki pages (id, category, title)
@@ -655,6 +654,33 @@ async function main(): Promise<void> {
   }
 
   const positional = args.filter((a) => !a.startsWith("-"));
+
+  if (positional[0] === "status") {
+    const orgRoot = findOrgRoot(process.cwd());
+    const lock = readLock(orgRoot);
+    const pending = scanPendingFiles(orgRoot, lock);
+    if (pending.length === 0) {
+      console.log(pc.green("✓") + " all files up to date");
+      return;
+    }
+    const newFiles = pending.filter((f) => f.status === "new");
+    const updated = pending.filter((f) => f.status === "updated");
+    if (newFiles.length > 0) {
+      console.log(pc.bold(`${newFiles.length} new`));
+      for (const f of newFiles) {
+        const scope = f.submoduleRoot ? pc.dim(` (${basename(f.submoduleRoot)})`) : "";
+        console.log(pc.green("  + ") + f.rel + scope);
+      }
+    }
+    if (updated.length > 0) {
+      console.log(pc.bold(`${updated.length} updated`));
+      for (const f of updated) {
+        const scope = f.submoduleRoot ? pc.dim(` (${basename(f.submoduleRoot)})`) : "";
+        console.log(pc.yellow("  ~ ") + f.rel + scope);
+      }
+    }
+    return;
+  }
 
   if (positional[0] === "init") {
     const dir = positional[1] ? resolve(positional[1]) : process.cwd();
