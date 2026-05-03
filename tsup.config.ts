@@ -1,4 +1,7 @@
 import { defineConfig } from "tsup";
+import { readFileSync } from "node:fs";
+
+const readme = readFileSync("README.md", "utf8");
 
 export default defineConfig({
   entry: ["src/index.ts"],
@@ -8,4 +11,7 @@ export default defineConfig({
   target: "node20",
   clean: true,
   splitting: false,
+  define: {
+    __README__: JSON.stringify(readme),
+  },
 });

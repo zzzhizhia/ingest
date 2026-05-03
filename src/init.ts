@@ -242,6 +242,12 @@ export function scaffoldWiki(dir: string): ScaffoldResult {
     }
   }
 
+  const example = join(dir, "raw", "example-ingest-readme.md");
+  if (!existsSync(example)) {
+    writeFileSync(example, __README__);
+    created.push("raw/example-ingest-readme.md");
+  }
+
   return { dir, created, skipped };
 }
 
