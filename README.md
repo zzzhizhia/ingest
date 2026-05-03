@@ -68,13 +68,13 @@ Key properties:
 ## Install
 
 ```bash
-npx @zzzhizhia/ingest
+npm install -g @zzzhizhia/ingest
 ```
 
-Or install globally:
+Or run directly:
 
 ```bash
-npm install -g @zzzhizhia/ingest
+npx @zzzhizhia/ingest
 ```
 
 ## Usage
