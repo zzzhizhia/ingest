@@ -8,6 +8,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
+import { CATEGORY_FILES } from "./wiki.js";
 
 // Sentinel injected for literal `${...}` so we can keep the bash payload
 // inside a String.raw template without escaping every parameter expansion.
@@ -220,7 +221,7 @@ This directory is an org-mode knowledge base managed by [ingest](https://github.
 ├── analyses.org        ← Analyses: comparisons, syntheses, deep dives
 ├── raw/                ← Immutable source material (ingested by \`ingest\` CLI)
 ├── subs/               ← Git submodule knowledge bases
-├── .ingest-lock.json   ← Digestion state (path → content hash + timestamp)
+├── ingest-lock.json    ← Digestion state (path → content hash + timestamp)
 └── CLAUDE.md           ← This file
 \`\`\`
 
@@ -311,12 +312,6 @@ When answering questions about this knowledge base:
 Source files are ingested by the \`ingest\` CLI, which invokes \`claude -p\` to extract knowledge into wiki pages. The CLI handles git commits and lock updates — Claude only reads sources and writes wiki files.
 `;
 
-const WIKI_CATEGORY_FILES = [
-  "entities.org",
-  "concepts.org",
-  "sources.org",
-  "analyses.org",
-];
 
 export type ScaffoldResult = {
   dir: string;
@@ -330,7 +325,7 @@ export function scaffoldWiki(dir: string): ScaffoldResult {
   const created: string[] = [];
   const skipped: string[] = [];
 
-  for (const f of WIKI_CATEGORY_FILES) {
+  for (const f of CATEGORY_FILES) {
     const p = join(dir, f);
     if (existsSync(p)) {
       skipped.push(f);
@@ -354,10 +349,16 @@ export function scaffoldWiki(dir: string): ScaffoldResult {
     created.push("raw/example-ingest-readme.md");
   }
 
-  const lockPath = join(dir, ".ingest-lock.json");
+  const lockPath = join(dir, "ingest-lock.json");
   if (!existsSync(lockPath)) {
     writeFileSync(lockPath, JSON.stringify({ version: 1, files: {} }, null, 2) + "\n");
-    created.push(".ingest-lock.json");
+    created.push("ingest-lock.json");
+  }
+
+  const configPath = join(dir, "ingest.json");
+  if (!existsSync(configPath)) {
+    writeFileSync(configPath, JSON.stringify({ model: "sonnet", effort: "medium" }, null, 2) + "\n");
+    created.push("ingest.json");
   }
 
   const gitignorePath = join(dir, ".gitignore");

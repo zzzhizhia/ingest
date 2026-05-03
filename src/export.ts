@@ -11,29 +11,11 @@ import { visit } from "unist-util-visit";
 // renders every selected page into one consolidated HTML bundle with a
 // sticky TOC and SPA-style hash navigation.
 
-export const CATEGORY_FILES = [
-  "entities.org",
-  "concepts.org",
-  "sources.org",
-  "analyses.org",
-] as const;
+import { CATEGORY_FILES, EXPECTED_TAG, type CategoryFile } from "./wiki.js";
 
-export type CategoryFile = (typeof CATEGORY_FILES)[number];
+const CATEGORY_LABEL = EXPECTED_TAG;
 
-const CATEGORY_LABEL: Record<CategoryFile, string> = {
-  "entities.org": "entity",
-  "concepts.org": "concept",
-  "sources.org": "source",
-  "analyses.org": "analysis",
-};
-
-// Order used when sorting non-start pages within the bundle.
-const CATEGORY_ORDER: CategoryFile[] = [
-  "entities.org",
-  "concepts.org",
-  "sources.org",
-  "analyses.org",
-];
+const CATEGORY_ORDER: CategoryFile[] = [...CATEGORY_FILES];
 
 // ── parsing ────────────────────────────────────────────────────────────────
 

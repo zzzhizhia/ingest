@@ -60,9 +60,23 @@ describe("scanPendingFiles", () => {
   });
 
   it("ignores unsupported file extensions", () => {
-    makeOrg(TMP, "raw/clips/image.png", "binary");
     makeOrg(TMP, "raw/clips/archive.zip", "binary");
+    makeOrg(TMP, "raw/clips/data.csv", "a,b,c");
     expect(scanPendingFiles(TMP, emptyLock())).toHaveLength(0);
+  });
+
+  it("includes image files", () => {
+    makeOrg(TMP, "raw/clips/photo.png", "binary");
+    makeOrg(TMP, "raw/clips/diagram.jpg", "binary");
+    const results = scanPendingFiles(TMP, emptyLock());
+    expect(results).toHaveLength(2);
+  });
+
+  it("includes audio files", () => {
+    makeOrg(TMP, "raw/plaud/meeting.m4a", "binary");
+    makeOrg(TMP, "raw/plaud/call.mp3", "binary");
+    const results = scanPendingFiles(TMP, emptyLock());
+    expect(results).toHaveLength(2);
   });
 
   it("includes .pdf files", () => {

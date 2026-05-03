@@ -1,27 +1,6 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-
-// Safe (deterministic) auto-fixes for common pre-commit hook violations.
-// Mirrors ESLint --fix vs --fix-unsafe split: this module only applies fixes
-// where the correct repair is structurally unambiguous. Anything that requires
-// guessing semantic intent (missing :ID:, missing :DATE:, duplicate :ID:,
-// broken link with 0 or multiple title matches) is left to the LLM fallback.
-
-export const CATEGORY_FILES = [
-  "entities.org",
-  "concepts.org",
-  "sources.org",
-  "analyses.org",
-] as const;
-
-export type CategoryFile = (typeof CATEGORY_FILES)[number];
-
-const EXPECTED_TAG: Record<CategoryFile, string> = {
-  "entities.org": "entity",
-  "concepts.org": "concept",
-  "sources.org": "source",
-  "analyses.org": "analysis",
-};
+import { CATEGORY_FILES, EXPECTED_TAG, type CategoryFile } from "./wiki.js";
 
 // Trailing tag block: optional whitespace, then `:tag1:` or `:tag1:tag2:...`
 const TAG_BLOCK_RE = /(\s+)(:[a-zA-Z_]+(?::[a-zA-Z_]+)*:)\s*$/;

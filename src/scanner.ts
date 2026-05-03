@@ -1,5 +1,5 @@
 import { readdirSync, existsSync } from "node:fs";
-import { join, relative } from "node:path";
+import { extname, join, relative } from "node:path";
 import { fileHash } from "./lock.js";
 import type { LockFile } from "./lock.js";
 
@@ -23,6 +23,15 @@ const SUPPORTED = new Set([
   ".pptx",
   ".xls",
   ".xlsx",
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".webp",
+  ".gif",
+  ".m4a",
+  ".mp3",
+  ".wav",
+  ".ogg",
 ]);
 
 const WIKI_FILES = new Set([
@@ -42,7 +51,7 @@ function* walkDir(dir: string, submoduleRoot?: string): Generator<{ abs: string;
       yield* walkDir(full, currentSubmodule);
     } else if (entry.isFile()) {
       if (isSubmodule && WIKI_FILES.has(entry.name)) continue;
-      const ext = entry.name.slice(entry.name.lastIndexOf("."));
+      const ext = extname(entry.name).toLowerCase();
       if (SUPPORTED.has(ext)) yield { abs: full, submoduleRoot: currentSubmodule };
     }
   }

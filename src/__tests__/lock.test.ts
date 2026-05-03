@@ -24,7 +24,7 @@ describe("readLock", () => {
         },
       },
     };
-    writeFileSync(join(TMP, ".ingest-lock.json"), JSON.stringify(data));
+    writeFileSync(join(TMP, "ingest-lock.json"), JSON.stringify(data));
     expect(readLock(TMP)).toEqual(data);
   });
 });

@@ -23,51 +23,98 @@ ingest
 
 # Ingest all pending files without prompting
 ingest --all
-ingest -a
 
 # Ingest specific files directly (skips pending scan)
 ingest raw/clips/article.org
 
-# Scaffold a blank wiki (4 category files + raw/ + subs/)
+# Show pending files, submodule grouping, and config
+ingest status
+
+# Scaffold a blank wiki (+ pre-commit hook if git repo)
 ingest init
 ingest init ./path/to/new-wiki
 
-# Install/refresh pre-commit hook (in an existing org root)
-ingest init
+# Remove a file from lock (makes it pending again for re-ingestion)
+ingest forget raw/clips/article.org
 
-# Apply deterministic safe fixes to wiki files (no ingest)
-ingest --fix
+# Validate wiki files (format, links, ID uniqueness)
+ingest lint
+
+# Validate + apply safe deterministic auto-fixes
+ingest lint --fix
+
+# Ask a question against the wiki via Claude
+ingest query "What do we know about X?"
 
 # Export a wiki page and its linked neighborhood as HTML
 ingest export <id> [--depth N] [--backlinks] [--output PATH] [--open]
 ingest export --list
 ```
 
+## Options
+
+| Option | Description |
+|--------|-------------|
+| `-a`, `--all` | Ingest all pending files without prompting |
+| `--verbose` | Stream Claude output in real-time (default: spinner with elapsed time) |
+| `--depth N` | BFS hops for export (default 1) |
+| `--backlinks` | Include reverse links during BFS for export |
+| `--output P` | Output HTML path for export |
+| `--output-root D` | Directory for export with auto Denote-style filename |
+| `--open` | Open exported HTML in browser |
+| `--fix` | Apply safe auto-fixes (used with `lint`) |
+
 ## Full Flow
 
 ```
-git pull --ff-only
+git pull --ff-only (auto stash/pop)
   ↓
 git submodule update --remote --init
   ↓
-Scan raw/ + subs/ vs .ingest-lock.json → find new + updated files
+Scan raw/ + subs/ vs ingest-lock.json → find new + updated files
+  ↓
+Pre-convert: Office → PDF (LibreOffice), audio → text (Whisper)
   ↓
 Interactive checkbox (skipped with --all or explicit paths)
   ↓
 Group files by submodule
   ↓
-For each group: claude -p --model sonnet session
-  • Main-repo files → writes to root wiki files
-  • Submodule files → writes to that submodule's wiki files (cwd = submodule root)
+Claude sessions (main repo sequential, submodules parallel)
   ↓
-Write lock entries to .ingest-lock.json (one per file)
+Write lock entries to ingest-lock.json (batch)
   ↓
-Commit submodules first (wiki files inside each submodule) + push
+Commit submodules first + push
   ↓
-Commit main repo (wiki files + lock + submodule pointers)
-  ↓
-git push
+Commit main repo (wiki files + lock + submodule pointers) + push
 ```
+
+## Config
+
+Place `ingest.json` at the org root to override defaults:
+
+```json
+{
+  "model": "sonnet",
+  "effort": "medium",
+  "allowedTools": ["Read", "Edit", "Bash(date *)", "Bash(date)", "Bash(grep *)", "Bash(git status)", "Bash(git log *)"],
+  "prompt": {
+    "systemAppend": "Additional instructions appended to the system prompt",
+    "userPrefix": "Text prepended to the user prompt"
+  }
+}
+```
+
+All fields are optional. Missing fields use the defaults shown above. `ingest init` generates a starter config with model and effort.
+
+## Supported File Types
+
+| Type | Extensions | Processing |
+|------|-----------|------------|
+| Text | `.org`, `.md`, `.txt` | Direct read |
+| PDF | `.pdf` | Direct read |
+| Office | `.doc`, `.docx`, `.ppt`, `.pptx`, `.xls`, `.xlsx` | Pre-converted to PDF via LibreOffice |
+| Image | `.png`, `.jpg`, `.jpeg`, `.webp`, `.gif` | Direct read via Claude vision |
+| Audio | `.m4a`, `.mp3`, `.wav`, `.ogg` | Pre-transcribed via Whisper |
 
 ## Submodule Knowledge Bases
 
@@ -80,7 +127,7 @@ When ingest finds source files inside a submodule, it:
 3. Commits inside the submodule, then pushes
 4. Main repo commits the submodule pointer update + lock
 
-Submodule wiki files at the root level (`entities.org`, etc.) are skipped during scanning — they are wiki output, not source material.
+Submodule Claude sessions run in parallel. Submodule wiki files at the root level are skipped during scanning.
 
 ## Scaffolding
 
@@ -91,32 +138,47 @@ entities.org
 concepts.org
 sources.org
 analyses.org
-.ingest-lock.json
+ingest-lock.json
+ingest.json
 raw/
   example-ingest-readme.md
 subs/
+.gitignore
+.gitattributes
+CLAUDE.md
 ```
 
 If the target directory is a git repository, the pre-commit hook is also installed.
 
-## Pending File Detection
+## Wiki Validation
 
-A file is considered pending if:
+`ingest lint` checks all four category files:
 
-- Its path is **not in** `.ingest-lock.json` → status `new`
-- Its path is in the lock but its **SHA-256 hash changed** → status `updated`
+- Every top-level heading has a tag, `:ID:`, and `:DATE:`
+- Tag matches the file (`entities.org` → `:entity:`, etc.)
+- `:ID:` format is `YYYYMMDDTHHMMSS`
+- All `[[id:...]]` links resolve to existing `:ID:` values
+- No duplicate `:ID:` across category files
+- `:PROPERTIES:` / `:END:` drawers are balanced
 
-Files with a matching hash in the lock are skipped. Supported extensions: `.org`, `.md`, `.txt`, `.pdf`, `.doc`, `.docx`, `.ppt`, `.pptx`, `.xls`, `.xlsx`.
+`ingest lint --fix` applies safe deterministic fixes before reporting:
 
-Office files (doc/docx/ppt/pptx/xls/xlsx) are pre-converted to PDF before Claude processes them.
+- Tag mismatch: replaces wrong tag with expected tag for the file
+- Broken link with unique title match: replaces invalid ID with the correct one
+
+The same validation runs as a pre-commit hook. If a commit is rejected during ingestion, the CLI retries with safe fixes first, then an LLM fix pass.
+
+## Query
+
+`ingest query "question"` invokes Claude in read-only mode against the wiki. Output is rendered with [glow](https://github.com/charmbracelet/glow) in interactive terminals, plain text when piped.
 
 ## What Claude Does
 
-Claude runs as a single `claude -p --model sonnet` session with all selected files. Its instructions are embedded in the CLI — it does not read `CLAUDE.md`.
+Claude runs as `claude -p` with model and effort from `ingest.json`. Its instructions are embedded in the CLI — it does not read `CLAUDE.md`.
 
 For each source file, Claude:
 
-1. Reads the file (chunked if > 200 KB)
+1. Reads the file (images via vision, audio via pre-transcription, Office via pre-conversion)
 2. Checks for existing wiki pages (`grep SOURCES:` in wiki files)
 3. Extracts entities, concepts, and key arguments with section-level attribution
 4. Matches existing headings (fuzzy) or appends new ones
@@ -131,33 +193,26 @@ Claude is **not** responsible for git commits or lock updates — the CLI handle
 
 | Tool | Purpose |
 |------|---------|
-| `Read` | Read source files and wiki files |
+| `Read` | Read source files, wiki files, and images |
 | `Edit` | Write to wiki files |
 | `Bash(date *)` | Generate `YYYYMMDDTHHMMSS` IDs |
 | `Bash(grep *)` | Search for existing headings |
 | `Bash(git status)` | Check repo state |
 | `Bash(git log *)` | Read recent commit history |
 
-## Pre-commit Hook
-
-The hook (installed via `ingest init`) validates staged wiki category files:
-
-- Every top-level heading has a tag, `:ID:`, and `:DATE:`
-- Tag matches the file (`entities.org` → `:entity:`, etc.)
-- All `[[id:...]]` links resolve to existing `:ID:` values
-- No duplicate `:ID:` across category files
-- `:PROPERTIES:` / `:END:` drawers are balanced
-
-If a commit is rejected, ingest retries with two fix stages: deterministic safe fixes, then an LLM fix pass.
+Configurable via `allowedTools` in `ingest.json`.
 
 ## Org Root Detection
 
-The CLI walks up from the current directory looking for `.ingest-lock.json`. Run `ingest init` to scaffold a new wiki, or run from anywhere inside an existing one.
+The CLI walks up from the current directory looking for `ingest-lock.json`. Run `ingest init` to scaffold a new wiki, or run from anywhere inside an existing one.
 
 ## Requirements
 
 - Node >= 20
-- `claude` CLI in PATH — install via `npm install -g @anthropic-ai/claude-code`
+- `claude` CLI in PATH
+- LibreOffice (optional, for Office file conversion)
+- Whisper (optional, for audio transcription)
+- glow (optional, for rendered query output)
 
 ## License
 
