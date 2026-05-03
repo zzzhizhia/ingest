@@ -260,6 +260,12 @@ export function scaffoldWiki(dir: string): ScaffoldResult {
     created.push(".gitignore");
   }
 
+  const gitattrsPath = join(dir, ".gitattributes");
+  if (!existsSync(gitattrsPath)) {
+    writeFileSync(gitattrsPath, "* text=auto eol=lf\n");
+    created.push(".gitattributes");
+  }
+
   return { dir, created, skipped };
 }
 
