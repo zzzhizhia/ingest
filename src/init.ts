@@ -256,7 +256,7 @@ export function scaffoldWiki(dir: string): ScaffoldResult {
 
   const gitignorePath = join(dir, ".gitignore");
   if (!existsSync(gitignorePath)) {
-    writeFileSync(gitignorePath, ".DS_Store\n*~\n\\#*\\#\n.#*\n.claude/\n");
+    writeFileSync(gitignorePath, ".DS_Store\n*.elc\n*.db\n.org-id-locations\n.orgids\n*~\n\\#*\\#\n.#*\n.claude/\n");
     created.push(".gitignore");
   }
 
