@@ -2,6 +2,69 @@
 
 Interactive CLI for ingesting raw source files into an org-mode LLM wiki via `claude -p`. Supports standalone knowledge bases and git submodule knowledge bases with independent digestion.
 
+## Knowledge Base Structure
+
+An ingest knowledge base is a git repository with this layout:
+
+```
+my-wiki/
+├── entities.org          ← People, organizations, products, places
+├── concepts.org          ← Ideas, theories, frameworks, methods
+├── sources.org           ← One summary per ingested source file
+├── analyses.org          ← Comparisons, syntheses, deep dives
+├── summary.org           ← Dashboard + activity log (optional, main repo only)
+├── raw/                  ← Immutable source material
+│   ├── clips/            ←   Web clippings (.org, .md)
+│   ├── books/            ←   Book notes
+│   ├── papers/           ←   Academic papers (.pdf)
+│   ├── plaud/            ←   Audio transcripts
+│   └── assets/           ←   Images, diagrams
+├── subs/                 ← Git submodule knowledge bases
+│   ├── team-wiki/        ←   Each with its own entities/concepts/sources/analyses.org
+│   └── project-wiki/
+├── ingest-lock.json      ← Digestion state (path → content hash + timestamp)
+├── ingest.json           ← CLI config (model, effort, allowedTools)
+├── CLAUDE.md             ← Schema instructions for Claude
+├── .gitignore
+└── .gitattributes
+```
+
+**Category files** are org-mode files where each top-level heading is a wiki "page":
+
+```org
+* Claude Code                                                        :entity:
+:PROPERTIES:
+:ID:       20260503T120000
+:DATE:     [2026-05-03]
+:SOURCES:  raw/clips/20260503T115200--claude-code-announcement__dev.org
+:END:
+
+** Overview
+
+Anthropic's CLI tool for AI-assisted software development.
+
+** Content
+
+Claude Code provides terminal-based access to Claude...
+  [source: raw/clips/20260503T115200--claude-code-announcement__dev.org § Features | HIGH]
+
+** Cross-references
+
+- [[id:20260501T090000][Anthropic]] — developer
+```
+
+Key properties:
+
+- **:ID:** — Timestamp identifier (`YYYYMMDDTHHMMSS`), unique across all files
+- **:DATE:** — Creation date in `[YYYY-MM-DD]` format
+- **:SOURCES:** — Path to the raw source file that contributed this page
+- **Tag** — One of `:entity:`, `:concept:`, `:source:`, `:analysis:`, must match the file
+- **Cross-references** — Bidirectional `[[id:...][Title]]` links between pages
+
+**Source files** under `raw/` are immutable — ingest never modifies them. They use [Denote naming](https://protesilaos.com/emacs/denote): `{YYYYMMDDTHHMMSS}--{title}__{tags}.ext`.
+
+**Submodule knowledge bases** under `subs/` are fully independent: own category files, own raw/, own git history. Useful for team/project wikis with different access permissions.
+
 ## Install
 
 ```bash
