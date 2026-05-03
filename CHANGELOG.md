@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.1.0] - 2026-05-03
+
+### Added
+
+- `ingest sub` command for subwiki management (list, add, new, remove)
+- Support removing multiple subwikis in one command
+
+### Changed
+
+- Renamed all user-facing "submodule" to "subwiki"
+- Subwiki detection simplified to any subdirectory under `subs/`
+
 ## [1.0.0] - 2026-05-03
 
 ### Added

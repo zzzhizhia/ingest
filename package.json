@@ -1,6 +1,6 @@
 {
   "name": "@zzzhizhia/ingest",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Interactive CLI for ingesting raw files into an org-mode LLM wiki",
   "type": "module",
   "bin": {
