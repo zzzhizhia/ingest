@@ -17,6 +17,7 @@ export type ClaudeRunOpts = {
   systemPrompt: string;
   prompt: string;
   label: string;
+  doneLabel?: string;
   config: IngestConfig;
   verbose?: boolean;
   /** When true, suppress all output framing and return raw text. */
@@ -107,13 +108,14 @@ export async function invokeClaude(opts: ClaudeRunOpts): Promise<ClaudeResult> {
       if (spinnerInterval) clearInterval(spinnerInterval);
       const elapsed = formatElapsed(Date.now() - startTime);
 
+      const doneLabel = opts.doneLabel ?? opts.label;
       if (opts.captureOutput) {
-        if (spinnerInterval) process.stdout.write(`\r${pc.green("✓")} ${pc.dim(opts.label)} ${pc.dim(elapsed)}\n`);
+        if (spinnerInterval) process.stdout.write(`\r${pc.green("✓")} ${pc.dim(doneLabel)} ${pc.dim(elapsed)}\n`);
       } else if (opts.verbose) {
         const W = 60;
         console.log(pc.dim("└" + "─".repeat(W) + "┘") + pc.dim(` ${elapsed}`));
       } else {
-        process.stdout.write(`\r${pc.green("✓")} ${pc.dim(opts.label)} ${pc.dim(elapsed)}\n`);
+        process.stdout.write(`\r${pc.green("✓")} ${pc.dim(doneLabel)} ${pc.dim(elapsed)}\n`);
         await printMarkdown(output);
       }
 
@@ -145,12 +147,13 @@ export async function runClaude(
   verbose?: boolean,
 ): Promise<boolean> {
   const cwd = submoduleRoot ?? orgRoot;
-  const label = submoduleRoot ? basename(submoduleRoot) : "ingesting";
+  const name = submoduleRoot ? basename(submoduleRoot) : undefined;
   const result = await invokeClaude({
     orgRoot: cwd,
     systemPrompt: submoduleRoot ? SUBMODULE_SYSTEM_PROMPT : SYSTEM_PROMPT,
     prompt: buildPrompt(orgRoot, files, convertedMap, submoduleRoot, config),
-    label,
+    label: name ?? "ingesting",
+    doneLabel: name ?? "ingested",
     config,
     verbose,
   });
