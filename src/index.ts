@@ -121,6 +121,7 @@ ${pc.bold("Usage")}
 
 ${pc.bold("Options")}
   -a, --all       ingest all pending files without prompting
+      --no-pull   skip git pull and subwiki sync before ingesting
       --verbose   stream Claude output in real-time (default: spinner)
       --depth N   BFS hops for export (default 1)
       --backlinks include reverse links during BFS for export
@@ -400,8 +401,10 @@ async function cmdIngest(args: string[]): Promise<void> {
   const orgRoot = findOrgRoot(process.cwd());
   const config = readConfig(orgRoot);
 
-  gitPull(orgRoot);
-  gitSubmoduleUpdate(orgRoot);
+  if (!args.includes("--no-pull")) {
+    gitPull(orgRoot);
+    gitSubmoduleUpdate(orgRoot);
+  }
 
   const allFlag = args.includes("--all") || args.includes("-a");
   const verbose = args.includes("--verbose");
@@ -603,7 +606,7 @@ async function main(): Promise<void> {
   const flags = args.filter((a) => a.startsWith("-"));
 
   const SUBCOMMANDS = new Set(["status", "init", "forget", "lint", "query", "export", "sub", "man"]);
-  const GLOBAL_FLAGS = new Set(["-a", "--all", "--verbose", "-V", "--version"]);
+  const GLOBAL_FLAGS = new Set(["-a", "--all", "--no-pull", "--verbose", "-V", "--version"]);
   const EXPORT_FLAGS = new Set(["--depth", "--backlinks", "--output", "--output-root", "--open", "--list"]);
   const LINT_FLAGS = new Set(["--fix"]);
 

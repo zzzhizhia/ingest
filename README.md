@@ -72,6 +72,7 @@ ingest export --list
 | Option | Description |
 |--------|-------------|
 | `-a`, `--all` | Ingest all pending files without prompting |
+| `--no-pull` | Skip git pull and subwiki sync before ingesting |
 | `-V`, `--version` | Show version and exit |
 | `--verbose` | Stream Claude output in real-time (default: spinner with elapsed time) |
 | `--depth N` | BFS hops for export (default 1) |
