@@ -147,7 +147,7 @@ Wiki root is detected by walking up for a dir containing ${pc.cyan("ingest-lock.
 
 function reportSafeFixes(applied: AppliedFix[]): void {
   if (applied.length === 0) return;
-  console.log(pc.green(`  ✓ applied ${applied.length} safe fix(es)`));
+  console.log(pc.green(`  ✓ applied ${applied.length} safe fix${applied.length === 1 ? "" : "es"}`));
   for (const f of applied) {
     console.log(pc.dim(`    ${f.kind}: ${f.description}`));
   }
@@ -192,7 +192,7 @@ function cmdStatus(): void {
   const smCount = new Set(pending.filter((f) => f.submoduleRoot).map((f) => f.submoduleRoot)).size;
   const mainCount = pending.filter((f) => !f.submoduleRoot).length;
   if (smCount > 0) {
-    console.log(pc.dim(`\n${smCount} subwiki(s), ${mainCount} main-repo file(s)`));
+    console.log(pc.dim(`\n${smCount} subwiki${smCount === 1 ? "" : "s"}, ${mainCount} main-repo file${mainCount === 1 ? "" : "s"}`));
   }
   console.log(pc.dim(`model: ${config.model}, effort: ${config.effort}`));
 }
@@ -237,7 +237,7 @@ function cmdLint(args: string[]): void {
   if (fix) {
     const fixResult = runSafeFixes(orgRoot);
     if (fixResult.applied.length > 0) {
-      console.log(pc.green(`✓ applied ${fixResult.applied.length} safe fix(es)`));
+      console.log(pc.green(`✓ applied ${fixResult.applied.length} safe fix${fixResult.applied.length === 1 ? "" : "es"}`));
       for (const f of fixResult.applied) {
         console.log(pc.dim(`  ${f.kind}: ${f.description}`));
       }
@@ -256,7 +256,7 @@ function cmdLint(args: string[]): void {
   }
   console.log();
   console.log(
-    pc.red(`✗ ${result.errors.length} issue(s)`) +
+    pc.red(`✗ ${result.errors.length} issue${result.errors.length === 1 ? "" : "s"}`) +
     pc.dim(` in ${result.headingCount} headings`),
   );
   process.exit(1);
@@ -344,7 +344,7 @@ async function cmdExport(args: string[], positional: string[]): Promise<void> {
     });
     console.log(
       pc.green("✓") +
-        ` ${result.pageCount} page(s) → ` +
+        ` ${result.pageCount} page${result.pageCount === 1 ? "" : "s"} → ` +
         pc.cyan(result.outputPath),
     );
     if (args.includes("--open")) {
@@ -423,7 +423,7 @@ async function cmdIngest(args: string[]): Promise<void> {
       return;
     }
 
-    console.log(pc.bold(`\n${pending.length} file(s) pending\n`));
+    console.log(pc.bold(`\n${pending.length} file${pending.length === 1 ? "" : "s"} pending\n`));
 
     if (allFlag) {
       toIngest = pending;
