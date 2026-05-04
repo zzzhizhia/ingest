@@ -69,6 +69,7 @@ export async function invokeClaude(opts: ClaudeRunOpts): Promise<ClaudeResult> {
       const padding = Math.max(0, W - header.length + 1);
       console.log(pc.dim(header + "─".repeat(padding) + "┐"));
     } else if (!opts.verbose) {
+      process.stdout.write("\n");
       spinnerInterval = setInterval(() => {
         const elapsed = formatElapsed(Date.now() - startTime);
         const spin = spinChars[spinIdx++ % spinChars.length];

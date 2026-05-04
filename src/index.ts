@@ -76,7 +76,7 @@ async function selectFiles(pending: PendingFile[]): Promise<PendingFile[]> {
     theme: {
       style: {
         renderSelectedChoices: (selected: { short: string }[]) =>
-          "\n" + selected.map((c) => "  " + c.short).join("\n") + "\n",
+          "\n" + selected.map((c) => "  " + c.short).join("\n"),
       },
     },
   });
@@ -140,7 +140,7 @@ ${pc.bold("Config")}
   Place ${pc.cyan("ingest.json")} at the org root to override defaults:
   { "model": "sonnet", "effort": "medium", "allowedTools": [...] }
 
-Org root is detected by walking up for a dir containing ${pc.cyan("ingest-lock.json")}.
+Wiki root is detected by walking up for a dir containing ${pc.cyan("ingest-lock.json")}.
 `;
 
 // ── fix reporting ─────────────────────────────────────────────────────────────
