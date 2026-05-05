@@ -544,8 +544,10 @@ async function cmdIngest(args: string[]): Promise<void> {
     }
 
     const safe = runSafeFixes(orgRoot);
+    if (safe.applied.length > 0) console.log();
     reportSafeFixes(safe.applied);
     if (safe.applied.length > 0) {
+      console.log();
       try {
         result = commitIngest(orgRoot, mainFilePaths, committedSubmodules);
       } catch (e) {
