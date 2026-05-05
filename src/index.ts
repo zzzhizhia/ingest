@@ -2,7 +2,7 @@ import { checkbox } from "@inquirer/prompts";
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { realpathSync } from "node:fs";
-import { basename, join, resolve } from "node:path";
+import { basename, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import pc from "picocolors";
 import { invokeClaude, runClaude, runClaudeFix } from "./claude.js";
@@ -108,6 +108,7 @@ ${pc.bold("Usage")}
   ingest status              show pending files (new + updated)
   ingest init [path]         scaffold blank wiki (+ pre-commit hook if git repo)
   ingest forget <path>       remove file from lock (makes it pending again)
+  ingest lock <path> [...]   write file SHA to lock (skip ingest, mark done)
   ingest lint                validate wiki files (format, links, IDs)
   ingest lint [--fix]        validate wiki files [+ apply safe auto-fixes]
   ingest query <question>    ask a question against the wiki via Claude
@@ -228,6 +229,28 @@ function cmdForget(positional: string[]): void {
   } else {
     console.error(pc.red("✗") + " " + rel + " not found in lock");
     process.exit(1);
+  }
+}
+
+function cmdLock(positional: string[]): void {
+  const paths = positional.slice(1);
+  if (paths.length === 0) {
+    console.error(pc.red("✗") + " usage: ingest lock <path> [path ...]");
+    process.exit(1);
+  }
+  const orgRoot = findOrgRoot(process.cwd());
+  const rels: string[] = [];
+  for (const p of paths) {
+    const abs = resolve(p);
+    if (!existsSync(abs)) {
+      console.error(pc.red("✗") + " file not found: " + p);
+      process.exit(1);
+    }
+    rels.push(relative(orgRoot, abs));
+  }
+  writeLockEntries(orgRoot, rels);
+  for (const rel of rels) {
+    console.log(pc.green("✓") + " locked " + pc.cyan(rel));
   }
 }
 
@@ -607,7 +630,7 @@ async function main(): Promise<void> {
   const positional = args.filter((a) => !a.startsWith("-"));
   const flags = args.filter((a) => a.startsWith("-"));
 
-  const SUBCOMMANDS = new Set(["status", "init", "forget", "lint", "query", "export", "sub", "man"]);
+  const SUBCOMMANDS = new Set(["status", "init", "forget", "lock", "lint", "query", "export", "sub", "man"]);
   const GLOBAL_FLAGS = new Set(["-a", "--all", "--no-pull", "--verbose", "-V", "--version"]);
   const EXPORT_FLAGS = new Set(["--depth", "--backlinks", "--output", "--output-root", "--open", "--list"]);
   const LINT_FLAGS = new Set(["--fix"]);
@@ -616,6 +639,7 @@ async function main(): Promise<void> {
   if (positional[0] === "status") return cmdStatus();
   if (positional[0] === "init") return cmdInit(positional);
   if (positional[0] === "forget") return cmdForget(positional);
+  if (positional[0] === "lock") return cmdLock(positional);
   if (positional[0] === "lint") return cmdLint(args);
   if (positional[0] === "query") return cmdQuery(positional);
   if (positional[0] === "export") return cmdExport(args, positional);
