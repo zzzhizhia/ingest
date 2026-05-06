@@ -28,8 +28,13 @@ npx @zzzhizhia/ingest init ./wiki
 - Node >= 20
 - `claude` CLI in PATH ([install guide](https://docs.anthropic.com/en/docs/claude-code/overview))
 - LibreOffice (optional, for Office file conversion)
-
 - glow (optional, for rendered query output)
+
+Optional dependencies can be installed via Homebrew:
+
+```bash
+brew install glow libreoffice
+```
 
 ## Usage
 
