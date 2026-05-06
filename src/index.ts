@@ -24,6 +24,7 @@ import { readLock, removeLockEntry, writeLockEntries } from "./lock.js";
 import { installPreCommitHook, scaffoldWiki } from "./init.js";
 import { scanPendingFiles, type PendingFile } from "./scanner.js";
 import { cmdSubAdd, cmdSubList, cmdSubNew, cmdSubRemove } from "./sub.js";
+import { cmdSync } from "./sync.js";
 
 // ── withQuit ──────────────────────────────────────────────────────────────────
 
@@ -630,10 +631,11 @@ async function main(): Promise<void> {
   const positional = args.filter((a) => !a.startsWith("-"));
   const flags = args.filter((a) => a.startsWith("-"));
 
-  const SUBCOMMANDS = new Set(["status", "init", "forget", "lock", "lint", "query", "export", "sub", "man"]);
+  const SUBCOMMANDS = new Set(["status", "init", "forget", "lock", "lint", "query", "export", "sub", "sync", "man"]);
   const GLOBAL_FLAGS = new Set(["-a", "--all", "--no-pull", "--verbose", "-V", "--version"]);
   const EXPORT_FLAGS = new Set(["--depth", "--backlinks", "--output", "--output-root", "--open", "--list"]);
   const LINT_FLAGS = new Set(["--fix"]);
+  const SYNC_FLAGS = new Set(["--one-way", "--non-interactive", "--strategy"]);
 
   if (positional[0] === "man") return cmdMan();
   if (positional[0] === "status") return cmdStatus();
@@ -644,6 +646,7 @@ async function main(): Promise<void> {
   if (positional[0] === "query") return cmdQuery(positional);
   if (positional[0] === "export") return cmdExport(args, positional);
   if (positional[0] === "sub") return cmdSub(positional);
+  if (positional[0] === "sync") return cmdSync(args, positional);
 
   if (positional[0] && !SUBCOMMANDS.has(positional[0]) && !existsSync(positional[0])) {
     console.error(pc.red("✗") + ` unknown command: ${positional[0]}`);
@@ -654,6 +657,7 @@ async function main(): Promise<void> {
   const validFlags = new Set([...GLOBAL_FLAGS]);
   if (positional[0] === "export") for (const f of EXPORT_FLAGS) validFlags.add(f);
   if (positional[0] === "lint") for (const f of LINT_FLAGS) validFlags.add(f);
+  if (positional[0] === "sync") for (const f of SYNC_FLAGS) validFlags.add(f);
 
   for (const f of flags) {
     const name = f.includes("=") ? f.slice(0, f.indexOf("=")) : f;
