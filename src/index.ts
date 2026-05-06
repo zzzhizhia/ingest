@@ -24,6 +24,7 @@ import { readLock, removeLockEntry, writeLockEntries } from "./lock.js";
 import { installPreCommitHook, scaffoldWiki } from "./init.js";
 import { scanPendingFiles, type PendingFile } from "./scanner.js";
 import { cmdSubAdd, cmdSubList, cmdSubNew, cmdSubRemove } from "./sub.js";
+import { cmdSchedule, deferIngest, parseDelay } from "./schedule.js";
 import { cmdSync } from "./sync.js";
 
 // ── withQuit ──────────────────────────────────────────────────────────────────
@@ -119,10 +120,13 @@ ${pc.bold("Usage")}
   ingest sub remove <n> ...  remove subwiki(s)
   ingest export <id>         render id + linked neighborhood as one HTML
   ingest export --list       list all wiki pages (id, category, title)
+  ingest schedule            list pending scheduled jobs
+  ingest schedule cancel     cancel all (or cancel <pid>)
   ingest man                 show full manual
 
 ${pc.bold("Options")}
   -a, --all       ingest all pending files without prompting
+      --at T      delay execution (e.g. 30m, 2h, 09:00; survives terminal close)
       --no-pull   skip git pull and subwiki sync before ingesting
       --verbose   stream Claude output in real-time (default: spinner)
       --depth N   BFS hops for export (default 1)
@@ -423,6 +427,22 @@ function cmdSub(positional: string[]): void {
 
 async function cmdIngest(args: string[]): Promise<void> {
   const orgRoot = findOrgRoot(process.cwd());
+
+  const atVal = getOpt(args, "--at");
+  if (atVal) {
+    const seconds = parseDelay(atVal);
+    if (seconds === null) {
+      console.error(pc.red("✗") + ` invalid --at value: ${atVal}`);
+      console.error(pc.dim("  e.g. 30m, 2h, 09:00"));
+      process.exit(1);
+    }
+    const fwd = args.filter((a) => a !== "--at" && a !== atVal);
+    if (!fwd.includes("--all") && !fwd.includes("-a") && !fwd.some((a) => !a.startsWith("-"))) {
+      fwd.push("--all");
+    }
+    return deferIngest(orgRoot, seconds, fwd);
+  }
+
   const config = readConfig(orgRoot);
 
   if (!args.includes("--no-pull")) {
@@ -628,11 +648,20 @@ async function main(): Promise<void> {
     return;
   }
 
-  const positional = args.filter((a) => !a.startsWith("-"));
-  const flags = args.filter((a) => a.startsWith("-"));
+  const VALUED_FLAGS = new Set(["--at", "--depth", "--output", "--output-root", "--strategy"]);
+  const positional: string[] = [];
+  const flags: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    if (args[i].startsWith("-")) {
+      flags.push(args[i]);
+      if (VALUED_FLAGS.has(args[i].split("=")[0]) && !args[i].includes("=")) i++;
+    } else {
+      positional.push(args[i]);
+    }
+  }
 
-  const SUBCOMMANDS = new Set(["status", "init", "forget", "lock", "lint", "query", "export", "sub", "sync", "man"]);
-  const GLOBAL_FLAGS = new Set(["-a", "--all", "--no-pull", "--verbose", "-V", "--version"]);
+  const SUBCOMMANDS = new Set(["status", "init", "forget", "lock", "lint", "query", "export", "sub", "sync", "schedule", "man"]);
+  const GLOBAL_FLAGS = new Set(["-a", "--all", "--at", "--no-pull", "--verbose", "-V", "--version"]);
   const EXPORT_FLAGS = new Set(["--depth", "--backlinks", "--output", "--output-root", "--open", "--list"]);
   const LINT_FLAGS = new Set(["--fix"]);
   const SYNC_FLAGS = new Set(["--one-way", "--non-interactive", "--strategy"]);
@@ -647,6 +676,7 @@ async function main(): Promise<void> {
   if (positional[0] === "export") return cmdExport(args, positional);
   if (positional[0] === "sub") return cmdSub(positional);
   if (positional[0] === "sync") return cmdSync(args, positional);
+  if (positional[0] === "schedule") return cmdSchedule(positional);
 
   if (positional[0] && !SUBCOMMANDS.has(positional[0]) && !existsSync(positional[0])) {
     console.error(pc.red("✗") + ` unknown command: ${positional[0]}`);
