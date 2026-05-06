@@ -63,12 +63,14 @@ export async function invokeClaude(opts: ClaudeRunOpts): Promise<ClaudeResult> {
     const spinChars = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
     let spinIdx = 0;
 
+    const isTTY = process.stdout.isTTY;
+
     if (opts.verbose && !opts.captureOutput) {
       const W = 60;
       const header = `┌─ ${opts.label} `;
       const padding = Math.max(0, W - header.length + 1);
       console.log(pc.dim(header + "─".repeat(padding) + "┐"));
-    } else if (!opts.verbose) {
+    } else if (!opts.verbose && isTTY) {
       process.stdout.write("\n");
       spinnerInterval = setInterval(() => {
         const elapsed = formatElapsed(Date.now() - startTime);
@@ -110,14 +112,15 @@ export async function invokeClaude(opts: ClaudeRunOpts): Promise<ClaudeResult> {
       const elapsed = formatElapsed(Date.now() - startTime);
 
       const doneLabel = opts.doneLabel ?? opts.label;
+      const prefix = isTTY ? "\r" : "";
       if (opts.captureOutput) {
-        if (spinnerInterval) process.stdout.write(`\r${pc.green("✓")} ${pc.dim(doneLabel)} ${pc.dim(elapsed)}\n`);
+        if (spinnerInterval) process.stdout.write(`${prefix}${pc.green("✓")} ${pc.dim(doneLabel)} ${pc.dim(elapsed)}\n`);
       } else if (opts.verbose) {
         const W = 60;
         console.log(pc.dim("└" + "─".repeat(W) + "┘") + pc.dim(` ${elapsed}`));
       } else {
-        process.stdout.write(`\r${pc.green("✓")} ${pc.dim(doneLabel)} ${pc.dim(elapsed)}\n`);
-        await printMarkdown(output);
+        process.stdout.write(`${prefix}${pc.green("✓")} ${pc.dim(doneLabel)} ${pc.dim(elapsed)}\n`);
+        if (isTTY) await printMarkdown(output);
       }
 
       if (interrupted) {
@@ -132,7 +135,7 @@ export async function invokeClaude(opts: ClaudeRunOpts): Promise<ClaudeResult> {
       process.off("SIGINT", onInterrupt);
       process.off("SIGTERM", onInterrupt);
       if (spinnerInterval) clearInterval(spinnerInterval);
-      process.stdout.write("\r");
+      if (isTTY) process.stdout.write("\r");
       console.error(err.message);
       resolve({ ok: false, output: "" });
     });
