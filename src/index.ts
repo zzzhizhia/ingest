@@ -105,7 +105,6 @@ ${pc.bold("ingest")}  Interactive ingest for an org-mode LLM wiki via ${pc.cyan(
 
 ${pc.bold("Usage")}
   ingest                     interactive checkbox of pending files
-  ingest --all               ingest every pending file, no prompt
   ingest <path> [path ...]   ingest specific files directly
   ingest status              show pending files (new + updated)
   ingest init [path]         scaffold blank wiki (+ pre-commit hook if git repo)
