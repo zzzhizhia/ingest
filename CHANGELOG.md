@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.4.0] - 2026-05-07
+
+### Added
+
+- `ingest sync` command for bidirectional wiki synchronization
+- `--at` flag for delayed execution (e.g. `--at 30m`, `--at 2h`, `--at 09:00`)
+- `ingest schedule` command to list and cancel pending scheduled jobs
+- Scheduled jobs self-cleanup from `$XDG_STATE_HOME/ingest/jobs.json` after completion
+
+### Fixed
+
+- Spinner and ANSI artifacts suppressed when stdout is not a TTY
+- Duplicate `--all` entry removed from help output
+- Positional arg parser correctly skips values of `--at` and other valued flags
+
 ## [1.1.1] - 2026-05-04
 
 ### Removed
