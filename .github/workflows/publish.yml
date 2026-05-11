@@ -20,6 +20,7 @@ jobs:
           cache: pnpm
           registry-url: https://registry.npmjs.org
 
+      - run: sudo apt-get install -y ripgrep
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - run: pnpm test
