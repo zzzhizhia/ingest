@@ -67,6 +67,10 @@ ingest lint --fix
 # Ask a question against the wiki via Claude
 ingest query "What do we know about X?"
 
+# Search wiki pages by title and print full org content
+ingest grep "Alice"
+ingest grep "^Claude$"
+
 # Export a wiki page and its linked neighborhood as HTML
 ingest export <id> [--depth N] [--backlinks] [--output PATH] [--open]
 ingest export --list
