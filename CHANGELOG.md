@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.5.1] - 2026-05-11
+
+### Changed
+
+- `ingest grep` now uses `rg` (ripgrep) for extraction -- keyword highlighting in TTY, raw output when piped
+- `ingest grep` heading displays clean wiki page title (purple in TTY) instead of raw `* Title :tag:`
+- Added `ingest rg` as alias for `ingest grep`
+- rg (ripgrep) is now a required dependency for `grep`/`rg` subcommand
+
 ## [1.5.0] - 2026-05-11
 
 ### Added

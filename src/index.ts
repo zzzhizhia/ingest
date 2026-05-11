@@ -118,7 +118,7 @@ ${pc.bold("Usage")}
   ingest sub add <url> [n]   add remote repo as subwiki
   ingest sub new <name>      create a new local subwiki
   ingest sub remove <n> ...  remove subwiki(s)
-  ingest grep <pattern>      show full page(s) whose title matches pattern
+  ingest grep <pattern>      show full page(s) whose title matches pattern (alias: rg)
   ingest export <id>         render id + linked neighborhood as one HTML
   ingest export --list       list all wiki pages (id, category, title)
   ingest schedule            list pending scheduled jobs
@@ -661,7 +661,7 @@ async function main(): Promise<void> {
     }
   }
 
-  const SUBCOMMANDS = new Set(["status", "init", "forget", "lock", "lint", "query", "grep", "export", "sub", "sync", "schedule", "man"]);
+  const SUBCOMMANDS = new Set(["status", "init", "forget", "lock", "lint", "query", "grep", "rg", "export", "sub", "sync", "schedule", "man"]);
   const GLOBAL_FLAGS = new Set(["-a", "--all", "--at", "--no-pull", "--verbose", "-V", "--version"]);
   const EXPORT_FLAGS = new Set(["--depth", "--backlinks", "--output", "--output-root", "--open", "--list"]);
   const LINT_FLAGS = new Set(["--fix"]);
@@ -674,7 +674,7 @@ async function main(): Promise<void> {
   if (positional[0] === "lock") return cmdLock(positional);
   if (positional[0] === "lint") return cmdLint(args);
   if (positional[0] === "query") return cmdQuery(positional);
-  if (positional[0] === "grep") {
+  if (positional[0] === "grep" || positional[0] === "rg") {
     const orgRoot = findOrgRoot(process.cwd());
     return cmdGrep(orgRoot, positional);
   }

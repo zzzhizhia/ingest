@@ -58,38 +58,41 @@ function captureStdout(fn: () => void): string {
 }
 
 describe("cmdGrep", () => {
-  it("outputs full page for exact title match", () => {
+  it("outputs clean title and body for title match", () => {
     fixtureWiki();
     const out = captureStdout(() => cmdGrep(TMP, ["grep", "Bob"]));
-    expect(out).toContain("* Bob");
-    expect(out).toContain(":ID: 20260101T000002");
+    expect(out).toMatch(/^Bob\n/);
+    expect(out).not.toContain("* Bob");
+    expect(out).toContain(":ID:       20260101T000002");
     expect(out).toContain("Bob is an engineer.");
   });
 
   it("matches case-insensitively", () => {
     fixtureWiki();
     const out = captureStdout(() => cmdGrep(TMP, ["grep", "bob"]));
-    expect(out).toContain("* Bob");
+    expect(out).toContain("Bob\n");
   });
 
   it("returns multiple matches for partial pattern", () => {
     fixtureWiki();
     const out = captureStdout(() => cmdGrep(TMP, ["grep", "Alice"]));
-    expect(out).toContain(":ID: 20260101T000001");
-    expect(out).toContain(":ID: 20260101T000003");
+    expect(out).toContain("20260101T000001");
+    expect(out).toContain("20260101T000003");
   });
 
-  it("supports regex patterns", () => {
-    fixtureWiki();
-    const out = captureStdout(() => cmdGrep(TMP, ["grep", "^Bob$"]));
-    expect(out).toContain(":ID: 20260101T000002");
-    expect(out).not.toContain("20260101T000001");
-  });
-
-  it("includes tags in output", () => {
+  it("does not include non-matching pages", () => {
     fixtureWiki();
     const out = captureStdout(() => cmdGrep(TMP, ["grep", "Bob"]));
-    expect(out).toContain(":entity:");
+    expect(out).toContain("20260101T000002");
+    expect(out).not.toContain("20260101T000001");
+    expect(out).not.toContain("20260101T000003");
+  });
+
+  it("includes properties drawer in output", () => {
+    fixtureWiki();
+    const out = captureStdout(() => cmdGrep(TMP, ["grep", "Bob"]));
+    expect(out).toContain(":PROPERTIES:");
+    expect(out).toContain(":END:");
   });
 
   it("exits 1 when no match found", () => {
