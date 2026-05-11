@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.5.0] - 2026-05-11
+
+### Added
+
+- `ingest grep <pattern>` command -- search wiki pages by title (regex, case-insensitive) and print full org content
+
 ## [1.4.0] - 2026-05-07
 
 ### Added
