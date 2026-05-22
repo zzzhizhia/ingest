@@ -84,7 +84,11 @@ function sourcePathsToAdd(orgRoot: string, files: string[]): string[] {
 
 export type CommitResult = { ok: true } | { ok: false; error: string };
 
-export function commitSubmodule(submoduleRoot: string, files: PendingFile[]): CommitResult {
+export function commitSubmodule(
+  submoduleRoot: string,
+  files: PendingFile[],
+  body?: string,
+): CommitResult {
   const label =
     files.length === 1
       ? basename(files[0].rel)
@@ -101,7 +105,9 @@ export function commitSubmodule(submoduleRoot: string, files: PendingFile[]): Co
 
   if (!hasChanges) return { ok: true };
 
-  const result = spawnSync("git", ["commit", "-m", `[ingest] ${label}`], {
+  const args = ["commit", "-m", `[ingest] ${label}`];
+  if (body) args.push("-m", body);
+  const result = spawnSync("git", args, {
     cwd: submoduleRoot,
     encoding: "utf8",
   });
@@ -114,7 +120,12 @@ export function commitSubmodule(submoduleRoot: string, files: PendingFile[]): Co
   return { ok: true };
 }
 
-export function commitIngest(orgRoot: string, files: string[], submodulePaths: string[] = []): CommitResult {
+export function commitIngest(
+  orgRoot: string,
+  files: string[],
+  submodulePaths: string[] = [],
+  body?: string,
+): CommitResult {
   const label =
     files.length === 1
       ? basename(files[0])
@@ -134,7 +145,9 @@ export function commitIngest(orgRoot: string, files: string[], submodulePaths: s
 
   if (!hasChanges) return { ok: true };
 
-  const result = spawnSync("git", ["commit", "-m", `[ingest] ${label}`], {
+  const args = ["commit", "-m", `[ingest] ${label}`];
+  if (body) args.push("-m", body);
+  const result = spawnSync("git", args, {
     cwd: orgRoot,
     encoding: "utf8",
   });

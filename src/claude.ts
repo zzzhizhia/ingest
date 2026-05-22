@@ -149,7 +149,7 @@ export async function runClaude(
   config: IngestConfig,
   submoduleRoot?: string,
   verbose?: boolean,
-): Promise<boolean> {
+): Promise<{ ok: boolean; output: string }> {
   const cwd = submoduleRoot ?? orgRoot;
   const name = submoduleRoot ? basename(submoduleRoot) : undefined;
   const result = await invokeClaude({
@@ -161,7 +161,7 @@ export async function runClaude(
     config,
     verbose,
   });
-  return result.ok;
+  return { ok: result.ok, output: result.output };
 }
 
 export async function runClaudeFix(

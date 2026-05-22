@@ -518,20 +518,23 @@ async function cmdIngest(args: string[]): Promise<void> {
   }
 
   // ── run Claude: main repo files ──
+  let mainOutput = "";
   if (mainFiles.length > 0) {
-    const ok = await runClaude(orgRoot, mainFiles, convertedMap, config, undefined, verbose);
-    if (!ok) {
+    const result = await runClaude(orgRoot, mainFiles, convertedMap, config, undefined, verbose);
+    if (!result.ok) {
       console.error(pc.red("✗") + " claude exited with non-zero status");
       process.exit(1);
     }
+    mainOutput = result.output;
   }
 
   // ── run Claude: subwiki files (parallel across subwikis) ──
+  const submoduleOutputs = new Map<string, string>();
   if (submoduleGroups.size > 0) {
     const results = await Promise.all(
       [...submoduleGroups.entries()].map(async ([smRoot, smFiles]) => {
-        const ok = await runClaude(orgRoot, smFiles, convertedMap, config, smRoot, verbose);
-        return { smRoot, ok };
+        const res = await runClaude(orgRoot, smFiles, convertedMap, config, smRoot, verbose);
+        return { smRoot, ok: res.ok, output: res.output };
       }),
     );
     for (const { smRoot, ok } of results) {
@@ -539,6 +542,9 @@ async function cmdIngest(args: string[]): Promise<void> {
         console.error(pc.red("✗") + ` claude exited with non-zero status (${basename(smRoot)})`);
         process.exit(1);
       }
+    }
+    for (const { smRoot, output } of results) {
+      submoduleOutputs.set(smRoot, output);
     }
   }
 
@@ -548,7 +554,7 @@ async function cmdIngest(args: string[]): Promise<void> {
   // ── commit subwikis first ──
   const committedSubmodules: string[] = [];
   for (const [smRoot, smFiles] of submoduleGroups) {
-    const smResult = commitSubmodule(smRoot, smFiles);
+    const smResult = commitSubmodule(smRoot, smFiles, submoduleOutputs.get(smRoot));
     if (!smResult.ok) {
       console.warn(pc.yellow("⚠") + ` subwiki commit failed (${basename(smRoot)}): ${smResult.error}`);
     } else {
@@ -573,7 +579,7 @@ async function cmdIngest(args: string[]): Promise<void> {
 
   let result: CommitResult;
   try {
-    result = commitIngest(orgRoot, mainFilePaths, committedSubmodules);
+    result = commitIngest(orgRoot, mainFilePaths, committedSubmodules, mainOutput);
   } catch (e) {
     console.warn(pc.yellow("⚠") + " git commit failed:", (e as Error).message);
     gitPush(orgRoot);
@@ -594,7 +600,7 @@ async function cmdIngest(args: string[]): Promise<void> {
     if (safe.applied.length > 0) {
       console.log();
       try {
-        result = commitIngest(orgRoot, mainFilePaths, committedSubmodules);
+        result = commitIngest(orgRoot, mainFilePaths, committedSubmodules, mainOutput);
       } catch (e) {
         console.warn(pc.yellow("⚠") + " git commit failed:", (e as Error).message);
         gitPush(orgRoot);
@@ -609,7 +615,7 @@ async function cmdIngest(args: string[]): Promise<void> {
       break;
     }
     try {
-      result = commitIngest(orgRoot, mainFilePaths, committedSubmodules);
+      result = commitIngest(orgRoot, mainFilePaths, committedSubmodules, mainOutput);
     } catch (e) {
       console.warn(pc.yellow("⚠") + " git commit failed:", (e as Error).message);
       gitPush(orgRoot);
