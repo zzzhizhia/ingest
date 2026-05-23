@@ -76,4 +76,22 @@ describe("readConfig", () => {
     expect(cfg.model).toBe("haiku");
     expect((cfg as unknown as Record<string, unknown>).unknownField).toBeUndefined();
   });
+
+  it("defaults noPull to false", () => {
+    writeFileSync(
+      join(TMP, "ingest.json"),
+      JSON.stringify({ model: "opus" }),
+    );
+    const cfg = readConfig(TMP);
+    expect(cfg.noPull).toBe(false);
+  });
+
+  it("reads noPull from ingest.json", () => {
+    writeFileSync(
+      join(TMP, "ingest.json"),
+      JSON.stringify({ noPull: true }),
+    );
+    const cfg = readConfig(TMP);
+    expect(cfg.noPull).toBe(true);
+  });
 });

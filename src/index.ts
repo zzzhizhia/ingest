@@ -146,7 +146,7 @@ ${pc.bold("Flow")}
 
 ${pc.bold("Config")}
   Place ${pc.cyan("ingest.json")} at the org root to override defaults:
-  { "model": "sonnet", "effort": "medium", "allowedTools": [...] }
+  { "model": "sonnet", "effort": "medium", "noPull": false, "allowedTools": [...] }
 
 Wiki root is detected by walking up for a dir containing ${pc.cyan("ingest-lock.json")}.
 `;
@@ -446,7 +446,7 @@ async function cmdIngest(args: string[]): Promise<void> {
 
   const config = readConfig(orgRoot);
 
-  if (!args.includes("--no-pull")) {
+  if (!args.includes("--no-pull") && !config.noPull) {
     gitPull(orgRoot);
     gitSubmoduleUpdate(orgRoot);
   }

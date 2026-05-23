@@ -4,6 +4,7 @@ import { join } from "node:path";
 export interface IngestConfig {
   model: string;
   effort: string;
+  noPull: boolean;
   allowedTools: string[];
   prompt?: {
     systemAppend?: string;
@@ -24,6 +25,7 @@ const DEFAULT_ALLOWED_TOOLS = [
 const DEFAULTS: IngestConfig = {
   model: "sonnet",
   effort: "medium",
+  noPull: false,
   allowedTools: DEFAULT_ALLOWED_TOOLS,
 };
 
@@ -49,6 +51,7 @@ export function readConfig(orgRoot: string): IngestConfig {
   return {
     model: typeof obj.model === "string" ? obj.model : DEFAULTS.model,
     effort: typeof obj.effort === "string" ? obj.effort : DEFAULTS.effort,
+    noPull: typeof obj.noPull === "boolean" ? obj.noPull : DEFAULTS.noPull,
     allowedTools: Array.isArray(obj.allowedTools)
       ? (obj.allowedTools as string[])
       : DEFAULTS.allowedTools,
