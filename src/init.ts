@@ -149,7 +149,7 @@ for f in $STAGED_CATEGORY_FILES; do
   LINKS=$(grep -oh '\[\[id:[0-9T]*\]' "$f" 2>/dev/null | grep -oh 'id:[0-9T]*' | sort -u || true)
   for link in $LINKS; do
     id="${D}{link#id:}"
-    if ! echo "$ALL_IDS" | grep -q "^${D}{id}$"; then
+    if ! grep -q "^${D}{id}$" <<< "$ALL_IDS"; then
       ERRORS+=("LINK: broken ${D}{link} in $f (no heading with :ID: ${D}{id})")
     fi
   done
