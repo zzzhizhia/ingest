@@ -85,13 +85,14 @@ export const SYSTEM_PROMPT = `\
 2. **验证**：文件不存在或为空则跳过并报告。
 3. **提取关键信息**：识别实体、概念、关键论点和论据。记录每个论点所在章节。
 4. **匹配已有 heading**（其他源可能已建过同名实体/概念）：
-   \`grep -n "^\\* .*{name}" entities.org concepts.org sources.org analyses.org\`
+   优先 \`ingest grep {name}\`（自动提取完整页面，比原始 grep 更易读）；
+   备选 \`grep -n "^\\* .*{name}" entities.org concepts.org sources.org analyses.org\`。
    使用模糊匹配："Richard Stallman" 应匹配 "Stallman" 或 "RMS"。
    — 匹配到：把本源的新信息追加到已有页面的 \`** 内容\` 章节，附 [source: ...] 标注。
    — 未匹配：在对应文件末尾追加新 heading（按模板）。
-5. **交叉验证**（写入前必须执行）：对即将写入的每个关键事实（实体名称、事件归属、组织关系），grep 已有 wiki 检查冲突：
-   - 名称验证：源文件提到一个实体 → grep 关键特征词（功能、人物、场景）确认 wiki 中是否已有同一事物用不同名称。如有，使用已有名称，标注 \`[source 原文称 X]\`。
-   - 归属验证：源文件将某事件归于某实体 → grep 该实体已有内容确认一致性。如已有内容无此事件记录且无法确认，标注 \`[unverified]\`。
+5. **交叉验证**（写入前必须执行）：对即将写入的每个关键事实（实体名称、事件归属、组织关系），用 ingest grep 或 grep 搜索已有 wiki 检查冲突：
+   - 名称验证：源文件提到一个实体 → ingest grep 关键特征词（功能、人物、场景）确认 wiki 中是否已有同一事物用不同名称。如有，使用已有名称，标注 \`[source 原文称 X]\`。
+   - 归属验证：源文件将某事件归于某实体 → ingest grep 该实体已有内容确认一致性。如已有内容无此事件记录且无法确认，标注 \`[unverified]\`。
    - 推断验证：源文件中的推断性结论（"可通过 A 接触 B"、"可能适合 X"）不作为事实写入，仅在讨论上下文中提及。
 6. **写入 source 页**（必须）：在 sources.org 末尾追加该源摘要页，:SOURCES: 指向源文件路径。
 7. **添加双向交叉引用**。
@@ -104,6 +105,7 @@ export const SYSTEM_PROMPT = `\
 1. **读取新源文件**：用 Read 工具读取���新版本。
 2. **找到所有引用此源的 wiki 页面**：
    \`grep -l "SOURCES:.*{path}" entities.org concepts.org sources.org analyses.org\`
+   （注：此搜索匹配页面正文内容，ingest grep 仅匹配标题，此处用原始 grep。）
    读取每个匹配页面的完整内容。
 3. **diff 新旧内容**：把新源内容和已有 wiki 页面对比：
    - **新增的论点**：源里有、wiki 没有 → 新增���对应页面，附 [source: ... | HIGH]，可加 \`[update YYYY-MM-DD]\` 时间标注。
@@ -175,7 +177,7 @@ export const FIX_SYSTEM_PROMPT = `\
 1. **broken link** (\`LINK: broken id:XXXX in <file> (no heading with :ID: XXXX)\`)
    - 原因：交叉引用��用了占位/行号/猜测的 ID，目标 heading 实际没有这个 :ID:。
    - 修复：从链接的显示文本（如 \`[[id:XXXX][元学习者]]\` 中的"元学习者"）出发，
-     用 grep 在 entities.org / concepts.org / sources.org / analyses.org 中查找
+     用 ingest grep 或 grep 在 entities.org / concepts.org / sources.org / analyses.org 中查找
      真正的 :ID:，再用 Edit 把 \`id:XXXX\` 替换为正确 ID。
    - 若确实找不到对应 heading：删除该交叉引用整行（合法，因为目标不存在）。
 
@@ -189,7 +191,7 @@ export const FIX_SYSTEM_PROMPT = `\
 ## 工作流
 
 1. 阅读 hook 错误输出，逐项识别问题。
-2. 用 Bash(grep) / Read 定位每个出错位置。
+2. 用 ingest grep / Bash(grep) / Read 定位每个出错位置。
 3. 用 Edit 工具最小化修复，只改触发错误的行。
 4. 不新增 wiki heading；不修改无关行；不执行 git add / git commit（外层会重试 commit）。
 

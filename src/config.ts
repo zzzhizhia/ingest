@@ -18,6 +18,8 @@ const DEFAULT_ALLOWED_TOOLS = [
   "Bash(date *)",
   "Bash(date)",
   "Bash(grep *)",
+  "Bash(ingest grep *)",
+  "Bash(ingest rg *)",
   "Bash(git status)",
   "Bash(git log *)",
 ];

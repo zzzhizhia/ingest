@@ -306,7 +306,7 @@ const QUERY_SYSTEM_PROMPT = `\
 
 ## 工作流
 
-1. 用 Bash(grep) 和 Read 搜索相关 heading。文件较大时先搜关键词定位，再读具体段落。
+1. 优先 \`ingest grep <关键词>\` 搜索相关 heading（自动提取完整页面内容）；文件较大或需搜正文时用 Bash(grep) 配合 Read。
 2. 综合回答，附 wiki heading 引用：[[id:ID][页面标题]]。
 3. 如果知识库中没有相关内容，明确告知"知识库中未找到相关信息"。
 4. 不要编造知识库中不存在的内容。
