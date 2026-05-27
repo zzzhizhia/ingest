@@ -141,7 +141,7 @@ ${pc.bold("Options")}
 ${pc.bold("Flow")}
   git pull --ff-only (auto stash/pop)
   scan raw/ vs ingest-lock.json → NEW + UPDATED files
-  claude -p --model sonnet (single session for all selected files)
+  claude -p --bare --model sonnet (single session for all selected files)
   write ingest-lock.json + git commit (with safe fix + LLM fix retry) + git push
 
 ${pc.bold("Config")}

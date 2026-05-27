@@ -46,6 +46,7 @@ export async function invokeClaude(opts: ClaudeRunOpts): Promise<ClaudeResult> {
       "claude",
       [
         "-p",
+        "--bare",
         "--model", opts.config.model,
         "--effort", opts.config.effort,
         "--permission-mode", "dontAsk",
