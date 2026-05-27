@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.5.4] - 2026-05-28
+
+### Changed
+
+- `claude -p` always runs with `--bare` (skip hooks, LSP, auto-memory, CLAUDE.md auto-discovery)
+
+## [1.5.3] - 2026-05-26
+
+### Added
+
+- `ingest grep` promoted to primary search tool in all prompts; auto-allowlisted in Claude tools
+
+### Fixed
+
+- Replace `echo|grep` pipeline with here-string to avoid pipefail false positive with large inputs
+
+## [1.5.2] - 2026-05-23
+
+### Added
+
+- `noPull` config option in `ingest.json` as alternative to `--no-pull` flag
+- Claude output included as git commit message body
+
 ## [1.5.1] - 2026-05-11
 
 ### Changed
