@@ -490,7 +490,6 @@ async function cmdIngest(args: string[]): Promise<void> {
       const scope = f.submoduleRoot ? pc.dim(` (${basename(f.submoduleRoot)})`) : "";
       console.log(`  ${tag} ${f.rel}${scope}`);
     }
-    console.log();
   }
 
   // ── group files by subwiki ──
