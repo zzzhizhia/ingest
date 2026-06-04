@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.5.5] - 2026-06-04
+
+### Added
+
+- `.html` to the supported source file types (direct read, no pre-conversion)
+
 ## [1.5.4] - 2026-05-28
 
 ### Changed
