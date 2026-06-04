@@ -202,6 +202,7 @@ All fields are optional. Missing fields use the defaults shown above. `ingest in
 | Type | Extensions | Processing |
 |------|-----------|------------|
 | Text | `.org`, `.md`, `.txt` | Direct read |
+| HTML | `.html` | Direct read |
 | PDF | `.pdf` | Direct read |
 | Office | `.doc`, `.docx`, `.ppt`, `.pptx`, `.xls`, `.xlsx` | Pre-converted to PDF via LibreOffice |
 

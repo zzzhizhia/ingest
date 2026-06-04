@@ -16,6 +16,7 @@ const SUPPORTED = new Set([
   ".org",
   ".md",
   ".txt",
+  ".html",
   ".pdf",
   ".doc",
   ".docx",
