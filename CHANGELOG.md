@@ -11,6 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - `.html` to the supported source file types (direct read, no pre-conversion)
 
+### Changed
+
+- Simplified `SUBMODULE_SYSTEM_PROMPT` chained calls and unified multi-line format
+
+### Fixed
+
+- Remove extra blank line between file list and ingesting spinner in auto mode
+
 ## [1.5.4] - 2026-05-28
 
 ### Changed
