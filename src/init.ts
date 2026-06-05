@@ -399,9 +399,8 @@ export function installPreCommitHook(orgRoot: string): InstallResult {
   if (lexists(path)) {
     const lst = lstatSync(path);
     if (lst.isSymbolicLink()) {
-      // Symlinks to in-repo files (e.g., scripts/hooks/pre-commit) are
-      // ingest's prior install method. Removing is safe — the link target
-      // still lives in the repo, tracked by git.
+      // User may have manually symlinked to a tracked file. Remove the
+      // link; we always install a managed file going forward.
       unlinkSync(path);
       action = "replaced-symlink";
     } else {

@@ -9,7 +9,7 @@ import { invokeClaude, runClaude, runClaudeFix } from "./claude.js";
 import { readConfig } from "./config.js";
 import { convertOfficeToPdf, isOfficeFile } from "./convert.js";
 import { listPages, runExport } from "./export.js";
-import { runSafeFixes, type AppliedFix } from "./fix.js";
+import { findRealBrokenIds, runSafeFixes, type AppliedFix } from "./fix.js";
 import {
   commitIngest,
   commitSubmodule,
@@ -606,6 +606,31 @@ async function cmdIngest(args: string[]): Promise<void> {
         return;
       }
       if (result.ok) break;
+    }
+
+    // Gate: if the only hook errors are false-positive `LINK: broken id:`
+    // entries (none of the reported IDs are actually missing from the wiki),
+    // skip the expensive Claude fix session and retry the commit directly.
+    // The hook may be flaky (e.g. SIGPIPE under `set -o pipefail`); a
+    // subsequent commit attempt may pass.
+    const realBroken = findRealBrokenIds(result.error, orgRoot);
+    const onlyFalsePositiveLinks =
+      realBroken.length === 0 && /LINK:\s+broken\s+id:/.test(result.error);
+    if (onlyFalsePositiveLinks) {
+      console.warn(
+        pc.dim(
+          "  → all reported broken IDs are valid in the wiki; skipping claude fix (likely hook false positive)",
+        ),
+      );
+      try {
+        result = commitIngest(orgRoot, mainFilePaths, committedSubmodules, mainOutput);
+      } catch (e) {
+        console.warn(pc.yellow("⚠") + " git commit failed:", (e as Error).message);
+        gitPush(orgRoot);
+        return;
+      }
+      if (result.ok) break;
+      // Fall through to Claude if the retry also failed.
     }
 
     const fixOk = await runClaudeFix(orgRoot, result.error, mainFiles, config, mainSessionId);
