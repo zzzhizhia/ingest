@@ -8,6 +8,31 @@ describe("SYSTEM_PROMPT", () => {
     expect(SYSTEM_PROMPT).toContain("sources.org");
     expect(SYSTEM_PROMPT).toContain("summary.org");
   });
+
+  it("contains the Iron Law invariant", () => {
+    expect(SYSTEM_PROMPT).toContain("## Iron Law");
+    expect(SYSTEM_PROMPT).toMatch(/`?raw\/`?\s+is immutable/);
+  });
+
+  it("contains red flags and the three canonical stops", () => {
+    expect(SYSTEM_PROMPT).toMatch(/[Rr]ed flags/);
+    expect(SYSTEM_PROMPT).toContain(":SOURCES:");
+    expect(SYSTEM_PROMPT).toContain("bidirectional");
+  });
+
+  it("contains Pre-Save Self-Check with the 6 items", () => {
+    expect(SYSTEM_PROMPT).toContain("Pre-Save Self-Check");
+    expect(SYSTEM_PROMPT).toContain("[unverified]");
+  });
+
+  it("caps Plaud _summary.md confidence at MED", () => {
+    expect(SYSTEM_PROMPT).toMatch(/_summary\.md/);
+    expect(SYSTEM_PROMPT).toMatch(/Plaud/);
+  });
+
+  it("contains the source-content-is-data rule", () => {
+    expect(SYSTEM_PROMPT).toMatch(/[Ss]ource content is data/);
+  });
 });
 
 describe("SUBMODULE_SYSTEM_PROMPT", () => {
@@ -16,7 +41,7 @@ describe("SUBMODULE_SYSTEM_PROMPT", () => {
   });
 
   it("says no need to update summary.org", () => {
-    expect(SUBMODULE_SYSTEM_PROMPT).toContain("无需更新 summary.org");
+    expect(SUBMODULE_SYSTEM_PROMPT).toContain("No summary.org update needed");
   });
 });
 
@@ -40,7 +65,7 @@ describe("buildPrompt", () => {
     ];
     const pdfMap = new Map([["raw/doc.docx", "/tmp/ingest/raw/doc.pdf"]]);
     const result = buildPrompt(orgRoot, files, pdfMap);
-    expect(result).toContain("→ 读取 /tmp/ingest/raw/doc.pdf");
+    expect(result).toContain("→ Read /tmp/ingest/raw/doc.pdf");
   });
 
   it("uses relative path for submodule files", () => {
@@ -65,6 +90,7 @@ describe("buildPrompt", () => {
     const config = {
       model: "sonnet",
       effort: "medium",
+      noPull: false,
       allowedTools: [],
       prompt: { userPrefix: "CUSTOM PREFIX" },
     };
