@@ -5,11 +5,6 @@ import { CATEGORY_FILES, EXPECTED_TAG, type CategoryFile } from "./wiki.js";
 // Trailing tag block: optional whitespace, then `:tag1:` or `:tag1:tag2:...`
 const TAG_BLOCK_RE = /(\s+)(:[a-zA-Z_]+(?::[a-zA-Z_]+)*:)\s*$/;
 
-// Pre-commit hook line shape: `LINK: broken id:<id> in <file> (...)`.
-// Anchored to the `LINK:` prefix so the explanatory tail (no `LINK:` there)
-// and arbitrary `id:XXX` mentions elsewhere in the hook output don't match.
-const BROKEN_ID_RE = /LINK:\s+broken\s+id:(\S+)\s+in\s+(\S+)/g;
-
 type Heading = {
   file: CategoryFile;
   lineIdx: number; // 0-indexed
@@ -90,32 +85,6 @@ function parseWiki(orgRoot: string): WikiState {
   }
 
   return { fileLines, headings, validIds, titleIndex };
-}
-
-// Returns the subset of `LINK: broken id:<id> in <file>` entries from a
-// pre-commit hook error whose ID is NOT present in the wiki. Empty result
-// means every reported broken ID is actually valid in the wiki — a hook
-// false positive (e.g. SIGPIPE under `set -o pipefail`). The fix loop
-// uses that signal to skip the expensive Claude fix session and retry
-// the commit directly.
-export function findRealBrokenIds(
-  errorOutput: string,
-  orgRoot: string,
-): { id: string; file: string }[] {
-  if (!errorOutput) return [];
-  const { validIds } = parseWiki(orgRoot);
-  const real: { id: string; file: string }[] = [];
-  const seen = new Set<string>();
-  BROKEN_ID_RE.lastIndex = 0;
-  let m: RegExpExecArray | null;
-  while ((m = BROKEN_ID_RE.exec(errorOutput)) !== null) {
-    const [, id, file] = m;
-    const key = `${id}\t${file}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    if (!validIds.has(id)) real.push({ id, file });
-  }
-  return real;
 }
 
 export type AppliedFix = {

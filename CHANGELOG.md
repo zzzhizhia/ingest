@@ -9,7 +9,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
-- Skip claude fix session when pre-commit hook reports only false-positive `LINK: broken id` errors (e.g. SIGPIPE-induced `grep -q` under `set -o pipefail`); retry commit directly
 - Claude fix now resumes the just-finished ingest session (`--resume <session-id>`) instead of starting a fresh `claude -p`, so the model keeps its source-file and wiki context across the fix pass — no more cold re-read of every source file
 
 ## [1.5.5] - 2026-06-04

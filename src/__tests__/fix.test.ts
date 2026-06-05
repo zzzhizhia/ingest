@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { findRealBrokenIds, runSafeFixes } from "../fix.js";
+import { runSafeFixes } from "../fix.js";
 
 const TMP = join(import.meta.dirname, "__tmp_fix__");
 
@@ -212,112 +212,5 @@ describe("runSafeFixes — combined", () => {
     expect(ent[0]).toMatch(/:entity:\s*$/);
     const con = readLines("concepts.org");
     expect(con.some((l) => l.includes("[[id:20260101T000001][Alice]]"))).toBe(true);
-  });
-});
-
-describe("findRealBrokenIds", () => {
-  function setupWiki(files: Record<string, string[]>): void {
-    for (const [name, lines] of Object.entries(files)) writeFile(name, lines);
-    for (const name of ["entities.org", "concepts.org", "sources.org", "analyses.org"]) {
-      if (!(name in files)) writeFile(name, []);
-    }
-  }
-
-  it("returns reported IDs that are missing from the wiki", () => {
-    setupWiki({
-      "entities.org": [
-        "* Alice                                                            :entity:",
-        ":PROPERTIES:",
-        ":ID:       20260101T000001",
-        ":DATE:     [2026-01-01]",
-        ":END:",
-        "",
-      ],
-    });
-    const err = [
-      "pre-commit: hook failed",
-      "LINK: broken id:9999 in entities.org (no heading with :ID: 9999)",
-      "LINK: broken id:8888 in concepts.org (no heading with :ID: 8888)",
-    ].join("\n");
-    const real = findRealBrokenIds(err, TMP);
-    expect(real).toHaveLength(2);
-    expect(real).toContainEqual({ id: "9999", file: "entities.org" });
-    expect(real).toContainEqual({ id: "8888", file: "concepts.org" });
-  });
-
-  it("returns empty when every reported broken ID is actually valid (the bug scenario)", () => {
-    setupWiki({
-      "entities.org": [
-        "* Alice                                                            :entity:",
-        ":PROPERTIES:",
-        ":ID:       20260101T000001",
-        ":DATE:     [2026-01-01]",
-        ":END:",
-        "",
-      ],
-      "concepts.org": [
-        "* Page                                                             :concept:",
-        ":PROPERTIES:",
-        ":ID:       20260101T000002",
-        ":DATE:     [2026-01-01]",
-        ":END:",
-        "",
-      ],
-    });
-    const err = [
-      "pre-commit: hook failed",
-      "LINK: broken id:20260101T000001 in entities.org (no heading with :ID: 20260101T000001)",
-      "LINK: broken id:20260101T000002 in concepts.org (no heading with :ID: 20260101T000002)",
-    ].join("\n");
-    expect(findRealBrokenIds(err, TMP)).toEqual([]);
-  });
-
-  it("returns only the real broken IDs when error mixes valid and invalid", () => {
-    setupWiki({
-      "entities.org": [
-        "* Alice                                                            :entity:",
-        ":PROPERTIES:",
-        ":ID:       20260101T000001",
-        ":DATE:     [2026-01-01]",
-        ":END:",
-        "",
-      ],
-    });
-    const err = [
-      "LINK: broken id:20260101T000001 in entities.org (no heading with :ID: 20260101T000001)",
-      "LINK: broken id:9999 in entities.org (no heading with :ID: 9999)",
-    ].join("\n");
-    expect(findRealBrokenIds(err, TMP)).toEqual([{ id: "9999", file: "entities.org" }]);
-  });
-
-  it("returns empty when error has no LINK: broken id: lines (other error type)", () => {
-    setupWiki({});
-    expect(findRealBrokenIds("ERROR: missing tag in entities.org:5", TMP)).toEqual([]);
-  });
-
-  it("returns empty for empty error string", () => {
-    expect(findRealBrokenIds("", TMP)).toEqual([]);
-  });
-
-  it("ignores malformed LINK: broken id: lines with no id or file", () => {
-    setupWiki({});
-    const err = "LINK: broken id: in entities.org\nLINK: broken id:9999";
-    expect(findRealBrokenIds(err, TMP)).toEqual([]);
-  });
-
-  it("ignores unrelated noise and only parses LINK: broken id: lines", () => {
-    setupWiki({});
-    const err = [
-      "pre-commit: starting",
-      "  checking entities.org...",
-      "LINK: broken id:1234 in entities.org (no heading with :ID: 1234)",
-      "  done in 0.2s",
-    ].join("\n");
-    expect(findRealBrokenIds(err, TMP)).toEqual([{ id: "1234", file: "entities.org" }]);
-  });
-
-  it("does not match the explanatory tail '(no heading with :ID: XXX)'", () => {
-    setupWiki({});
-    expect(findRealBrokenIds("(no heading with :ID: 9999)", TMP)).toEqual([]);
   });
 });
