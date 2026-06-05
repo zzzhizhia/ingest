@@ -168,40 +168,6 @@ export const SUBMODULE_SYSTEM_PROMPT = SYSTEM_PROMPT.replace(
   "## 完成所有文件后\n\n无需更新 summary.org（子知识库不使用此文件）。",
 );
 
-export const FIX_SYSTEM_PROMPT = `\
-你是 org-mode wiki 的 pre-commit 修复引擎。一次 [ingest] commit 刚被 pre-commit hook 拒绝，
-你的唯一任务是修复 hook 报出的所有问题，让外层重试 commit 时通过。
-
-## 常见错误与修复策略
-
-1. **broken link** (\`LINK: broken id:XXXX in <file> (no heading with :ID: XXXX)\`)
-   - 原因：交叉引用��用了占位/行号/猜测的 ID，目标 heading 实际没有这个 :ID:。
-   - 修复：从链接的显示文本（如 \`[[id:XXXX][元学习者]]\` 中的"元学习者"）出发，
-     用 ingest grep 或 grep 在 entities.org / concepts.org / sources.org / analyses.org 中查找
-     真正的 :ID:，再用 Edit 把 \`id:XXXX\` 替换为正确 ID。
-   - 若确实找不到对应 heading：删除该交叉引用整行（合法，因为目标不存在）。
-
-2. **missing :ID: / :DATE: / 缺少标签**：heading 不符合页面模板。
-   - 修复：补全缺失字段。:ID: 用 \`date +%Y%m%dT%H%M%S\` 生成，:DATE: 用 \`[YYYY-MM-DD]\`。
-
-3. **invalid tag**：heading 标签与所在文件不匹配。
-   - 修复：entities.org → :entity:，concepts.org → :concept:，
-     sources.org → :source:，analyses.org → :analysis:。
-
-## 工作流
-
-1. 阅读 hook 错误输出，逐项识别问题。
-2. 用 ingest grep / Bash(grep) / Read 定位每个出错位置。
-3. 用 Edit 工具最小化修复，只改触发错误的行。
-4. 不新增 wiki heading；不修改无关行；不执行 git add / git commit（外层会重试 commit）。
-
-## 安全规则
-
-1. 绝不删除已有 wiki heading（只能删除断开的交叉引用条目）。
-2. 绝不修改 raw/ 下的源文件。
-3. 修改最小化：只动 hook 错误指向的具体位置。
-`;
-
 export function buildPrompt(
   orgRoot: string,
   files: PendingFile[],

@@ -129,7 +129,6 @@ ${pc.bold("Options")}
   -a, --all       ingest all pending files without prompting
       --at T      delay execution (e.g. 30m, 2h, 09:00; survives terminal close)
       --no-pull   skip git pull and subwiki sync before ingesting
-      --verbose   stream Claude output in real-time (default: spinner)
       --depth N   BFS hops for export (default 1)
       --backlinks include reverse links during BFS for export
       --output P  output HTML path for export (full path)
@@ -452,7 +451,6 @@ async function cmdIngest(args: string[]): Promise<void> {
   }
 
   const allFlag = args.includes("--all") || args.includes("-a");
-  const verbose = args.includes("--verbose");
   const explicitFiles = args.filter((a) => !a.startsWith("-"));
 
   const lock = readLock(orgRoot);
@@ -518,13 +516,15 @@ async function cmdIngest(args: string[]): Promise<void> {
 
   // ── run Claude: main repo files ──
   let mainOutput = "";
+  let mainSessionId = "";
   if (mainFiles.length > 0) {
-    const result = await runClaude(orgRoot, mainFiles, convertedMap, config, undefined, verbose);
+    const result = await runClaude(orgRoot, mainFiles, convertedMap, config);
     if (!result.ok) {
       console.error(pc.red("✗") + " claude exited with non-zero status");
       process.exit(1);
     }
     mainOutput = result.output;
+    mainSessionId = result.sessionId;
   }
 
   // ── run Claude: subwiki files (parallel across subwikis) ──
@@ -532,7 +532,7 @@ async function cmdIngest(args: string[]): Promise<void> {
   if (submoduleGroups.size > 0) {
     const results = await Promise.all(
       [...submoduleGroups.entries()].map(async ([smRoot, smFiles]) => {
-        const res = await runClaude(orgRoot, smFiles, convertedMap, config, smRoot, verbose);
+        const res = await runClaude(orgRoot, smFiles, convertedMap, config, smRoot);
         return { smRoot, ok: res.ok, output: res.output };
       }),
     );
@@ -608,7 +608,7 @@ async function cmdIngest(args: string[]): Promise<void> {
       if (result.ok) break;
     }
 
-    const fixOk = await runClaudeFix(orgRoot, result.error, mainFiles, config, verbose);
+    const fixOk = await runClaudeFix(orgRoot, result.error, mainFiles, config, mainSessionId);
     if (!fixOk) {
       console.error(pc.red("✗") + " claude fix exited with non-zero status");
       break;
@@ -667,7 +667,7 @@ async function main(): Promise<void> {
   }
 
   const SUBCOMMANDS = new Set(["status", "init", "forget", "lock", "lint", "query", "grep", "rg", "export", "sub", "sync", "schedule", "man"]);
-  const GLOBAL_FLAGS = new Set(["-a", "--all", "--at", "--no-pull", "--verbose", "-V", "--version"]);
+  const GLOBAL_FLAGS = new Set(["-a", "--all", "--at", "--no-pull", "-V", "--version"]);
   const EXPORT_FLAGS = new Set(["--depth", "--backlinks", "--output", "--output-root", "--open", "--list"]);
   const LINT_FLAGS = new Set(["--fix"]);
   const SYNC_FLAGS = new Set(["--one-way", "--non-interactive", "--strategy"]);
