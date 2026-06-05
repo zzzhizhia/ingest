@@ -8,12 +8,20 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { installPreCommitHook, PRE_COMMIT_HOOK } from "../init.js";
+import { CLAUDE_MD_TEMPLATE, installPreCommitHook, PRE_COMMIT_HOOK } from "../init.js";
 
 const TMP = join(import.meta.dirname, "__tmp_init__");
 
 beforeEach(() => mkdirSync(TMP, { recursive: true }));
 afterEach(() => rmSync(TMP, { recursive: true, force: true }));
+
+describe("CLAUDE_MD_TEMPLATE content", () => {
+  it("includes Iron Law, Page Template, and [unverified] marker", () => {
+    expect(CLAUDE_MD_TEMPLATE).toContain("## Iron Law");
+    expect(CLAUDE_MD_TEMPLATE).toContain("## Page Template");
+    expect(CLAUDE_MD_TEMPLATE).toContain("[unverified]");
+  });
+});
 
 describe("PRE_COMMIT_HOOK content", () => {
   it("starts with bash shebang", () => {
