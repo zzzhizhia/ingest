@@ -7,9 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-06-06
+
+### Added
+
+- `Iron Law` + `Red Flags` + `Pre-Save Self-Check` sections to the sub-process worker prompt (`src/prompts.ts`); mirrors the design from the auto-generated `CLAUDE.md`
+- `:CONTRADICTS:` property demo (comment line) in the page-template org block of both `src/init.ts` `CLAUDE_MD_TEMPLATE` and `src/prompts.ts` `SYSTEM_PROMPT`
+- `[unverified]` marker as a named safety rule
+- `## Attachments` section in the auto-generated `CLAUDE.md` template (Denote subdirectory co-location convention)
+- 6 new vitest assertions pinning the new schema sections across `prompts.test.ts` (5) and `init.test.ts` (1)
+
+### Changed
+
+- **i18n**: `src/prompts.ts` (SYSTEM_PROMPT, SUBMODULE_SYSTEM_PROMPT, buildPrompt, buildFixPrompt) and `src/index.ts` `QUERY_SYSTEM_PROMPT` translated from Chinese to English
+- Simplified `CLAUDE_MD_TEMPLATE` (init.ts): 103 → 87 lines; added Iron Law, Red Flags, Page Self-Check, `:CONTRADICTS:` demo, `[unverified]`, `## Attachments`; updated Query Workflow step 3 to propose Denote-named `raw/` files instead of writing `analyses.org` directly
+- Tightened `Page Creation Rules` (3 bullets → 1) in `src/prompts.ts`; only the "no trivial pages" rule is load-bearing
+- Added load-bearing comment above `SUBMODULE_SYSTEM_PROMPT.replace()` chain warning about the column-aligned table row and trailing English sentence being anchor strings (silent no-op if either changes)
+- Defined `+N ~M` log-line notation in summary.org update step (N = headings created, M = updated)
+
 ### Fixed
 
 - Claude fix now resumes the just-finished ingest session (`--resume <session-id>`) instead of starting a fresh `claude -p`, so the model keeps its source-file and wiki context across the fix pass — no more cold re-read of every source file
+- A5: real org-mode bug — `:CONTRADICTS:` PROPERTIES block was inside a `** Contradictions` body section (where org-mode silently ignores it). Moved to a `; CONTRADICTS:` comment line in the heading-level PROPERTIES drawer
+- Pre-existing tsc strict error: `prompts.test.ts` was missing `noPull: false` in its `IngestConfig` literal. `tsc --noEmit` now passes cleanly for the first time
 
 ## [1.5.5] - 2026-06-04
 
