@@ -293,7 +293,6 @@ Reference attachments via relative path. This keeps related files discoverable a
 
 1. Search the four category files before answering. If the four files don't cover the question, say so — do not answer from training data.
 2. Synthesize an answer with \`[[id:YYYYMMDDTHHMMSS][Title]]\` references.
-3. If the answer looks broadly reusable, propose a Denote-named file under \`raw/\` (subdir + tags per its nature). Do not create without explicit confirmation.
 `;
 
 
