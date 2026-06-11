@@ -14,7 +14,8 @@
   "scripts": {
     "build": "tsup",
     "test": "vitest run",
-    "dev": "tsup --watch"
+    "dev": "tsup --watch",
+    "prepublishOnly": "pnpm build"
   },
   "dependencies": {
     "@inquirer/prompts": "^7.5.2",
