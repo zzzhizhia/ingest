@@ -122,12 +122,19 @@ export function getRun(id: string): RunRecord | undefined {
  * `in-progress` ranks above `interrupted` (a live run should be preferred
  * over a stale interruption record). Within each status, sort by startedAt
  * descending.
+ *
+ * Runs without a `mainSessionId` are excluded — without it the claude
+ * `--resume` call has nothing to attach to, so the run cannot actually be
+ * resumed. Re-run `ingest` to start a fresh session for the remaining
+ * pending files.
  */
 export function findLatestResumable(wikiRoot?: string): RunRecord | undefined {
   const all = readRuns().runs;
   const resumable = all.filter(
     (r) =>
       (r.status === "in-progress" || r.status === "interrupted") &&
+      r.mainSessionId != null &&
+      r.mainSessionId !== "" &&
       (wikiRoot === undefined || r.wikiRoot === wikiRoot),
   );
   if (resumable.length === 0) return undefined;

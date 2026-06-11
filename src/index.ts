@@ -542,6 +542,18 @@ async function cmdResume(positional: string[]): Promise<void> {
       config,
       resumeSessionId: run.mainSessionId,
     });
+    if (result.aborted) {
+      // Persist any partial sessionId so a later resume can pick up where we
+      // left off -- parseClaudeJson may have decoded it from the buffer.
+      try {
+        updateRun(run.id, {
+          ...(result.sessionId ? { mainSessionId: result.sessionId } : {}),
+          status: "interrupted",
+          finishedAt: new Date().toISOString(),
+        });
+      } catch {}
+      process.exit(130);
+    }
     if (!result.ok) {
       try {
         updateRun(run.id, { status: "interrupted", finishedAt: new Date().toISOString() });
@@ -664,6 +676,16 @@ async function cmdIngest(args: string[]): Promise<void> {
   let mainSessionId = "";
   if (mainFiles.length > 0) {
     const result = await runClaude(orgRoot, mainFiles, convertedMap, config);
+    if (result.aborted) {
+      try {
+        updateRun(runId, {
+          ...(result.sessionId ? { mainSessionId: result.sessionId } : {}),
+          status: "interrupted",
+          finishedAt: new Date().toISOString(),
+        });
+      } catch {}
+      process.exit(130);
+    }
     if (!result.ok) {
       try { updateRun(runId, { status: "interrupted", finishedAt: new Date().toISOString() }); } catch {}
       console.error(pc.red("✗") + " claude exited with non-zero status");
@@ -680,10 +702,20 @@ async function cmdIngest(args: string[]): Promise<void> {
     const results = await Promise.all(
       [...submoduleGroups.entries()].map(async ([smRoot, smFiles]) => {
         const res = await runClaude(orgRoot, smFiles, convertedMap, config, smRoot);
-        return { smRoot, ok: res.ok, output: res.output };
+        return { smRoot, ok: res.ok, output: res.output, aborted: res.aborted, sessionId: res.sessionId };
       }),
     );
-    for (const { smRoot, ok } of results) {
+    for (const { smRoot, ok, aborted, sessionId } of results) {
+      if (aborted) {
+        try {
+          updateRun(runId, {
+            ...(sessionId ? { mainSessionId: sessionId } : {}),
+            status: "interrupted",
+            finishedAt: new Date().toISOString(),
+          });
+        } catch {}
+        process.exit(130);
+      }
       if (!ok) {
         try { updateRun(runId, { status: "interrupted", finishedAt: new Date().toISOString() }); } catch {}
         console.error(pc.red("✗") + ` claude exited with non-zero status (${basename(smRoot)})`);

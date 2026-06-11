@@ -29,6 +29,13 @@ export type ClaudeResult = {
   ok: boolean;
   output: string;
   sessionId: string;
+  /**
+   * True if the process was killed by SIGINT/SIGTERM (i.e. user abort).
+   * `output` and `sessionId` may still be populated from the partial JSON
+   * buffer, so callers can persist the sessionId for later `--resume` even
+   * when ok=false.
+   */
+  aborted: boolean;
 };
 
 function formatElapsed(ms: number): string {
@@ -150,10 +157,9 @@ export async function invokeClaude(opts: ClaudeRunOpts): Promise<ClaudeResult> {
 
       if (interrupted) {
         console.error(pc.red("✗") + " aborted by user");
-        process.exit(130);
       }
 
-      resolve({ ok: code === 0, output, sessionId });
+      resolve({ ok: code === 0 && !interrupted, output, sessionId, aborted: interrupted });
     });
 
     child.on("error", (err) => {
@@ -162,7 +168,7 @@ export async function invokeClaude(opts: ClaudeRunOpts): Promise<ClaudeResult> {
       if (spinnerInterval) clearInterval(spinnerInterval);
       if (isTTY) process.stdout.write("\r");
       console.error(err.message);
-      resolve({ ok: false, output: "", sessionId: "" });
+      resolve({ ok: false, output: "", sessionId: "", aborted: false });
     });
   });
 }
@@ -173,7 +179,7 @@ export async function runClaude(
   convertedMap: Map<string, string>,
   config: IngestConfig,
   submoduleRoot?: string,
-): Promise<{ ok: boolean; output: string; sessionId: string }> {
+): Promise<{ ok: boolean; output: string; sessionId: string; aborted: boolean }> {
   const cwd = submoduleRoot ?? orgRoot;
   const name = submoduleRoot ? basename(submoduleRoot) : undefined;
   const result = await invokeClaude({
@@ -184,7 +190,12 @@ export async function runClaude(
     doneLabel: name ?? "ingested",
     config,
   });
-  return { ok: result.ok, output: result.output, sessionId: result.sessionId };
+  return {
+    ok: result.ok,
+    output: result.output,
+    sessionId: result.sessionId,
+    aborted: result.aborted,
+  };
 }
 
 export async function runClaudeFix(
@@ -204,5 +215,5 @@ export async function runClaudeFix(
     config,
     resumeSessionId,
   });
-  return result.ok;
+  return result.ok && !result.aborted;
 }

@@ -13,7 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - `ingest resume [id]` subcommand — resume an interrupted run by replaying the original Claude session with `--resume <session-id> "continue"`; defaults to the latest in-progress or interrupted run for the current wiki
 - Run state persisted to `$XDG_STATE_HOME/ingest/runs.json` (machine-local, not version-controlled); survives Ctrl+C via SIGINT/SIGTERM hooks that mark the active run as `interrupted`
 - New `src/runs.ts` module: ULID-based run ids, XDG-state storage, `readRuns` / `addRun` / `updateRun` / `findLatestResumable` / `getRun` API
-- 15 vitest assertions in `runs.test.ts` covering ulid format, XDG path resolution, file round-trip, addRun accumulation, updateRun merge, findLatestResumable priority + sort
+- 22 vitest assertions in `runs.test.ts` covering ulid format, XDG path resolution, file round-trip, addRun accumulation, updateRun merge, findLatestResumable priority + sort + sessionId filter
+
+### Fixed
+
+- **resume broke on SIGINT**: `claude.ts` was calling `process.exit(130)` in its close handler before the caller could persist the parsed `session_id`, so any Ctrl+C during the main ingest run left the run record with `status: "interrupted"` but no `mainSessionId` — making `ingest resume` reject it with "no claude session id". `invokeClaude` now resolves with a new `aborted: true` flag; `cmdIngest` and `cmdResume` persist the sessionId (if present in the buffer) before `process.exit(130)`. `findLatestResumable` now also filters out runs with no `mainSessionId` so stale unresumable records don't surface.
 
 ## [1.6.0] - 2026-06-06
 

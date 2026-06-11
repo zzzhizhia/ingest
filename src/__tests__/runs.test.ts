@@ -116,6 +116,7 @@ describe("findLatestResumable", () => {
       startedAt: "2026-01-01T00:00:00.000Z",
       status: "in-progress",
       wikiRoot: "/w",
+      mainSessionId: "sess-default",
       ...over,
     };
   }
@@ -129,6 +130,18 @@ describe("findLatestResumable", () => {
     addRun(rec({ wikiRoot: "/other", status: "interrupted" }));
     addRun(rec({ wikiRoot: "/w", status: "interrupted" }));
     expect(findLatestResumable("/w")?.wikiRoot).toBe("/w");
+  });
+
+  it("skips runs with no mainSessionId (cannot be resumed)", () => {
+    addRun(rec({ status: "interrupted", mainSessionId: undefined }));
+    addRun(rec({ status: "interrupted", mainSessionId: "sess-1" }));
+    expect(findLatestResumable()?.mainSessionId).toBe("sess-1");
+  });
+
+  it("returns undefined when no run has a mainSessionId", () => {
+    addRun(rec({ status: "interrupted", mainSessionId: undefined }));
+    addRun(rec({ status: "in-progress", mainSessionId: undefined }));
+    expect(findLatestResumable()).toBeUndefined();
   });
 
   it("prefers in-progress over interrupted", () => {
