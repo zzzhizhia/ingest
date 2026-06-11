@@ -1,7 +1,5 @@
 import { spawn } from "node:child_process";
-import { existsSync } from "node:fs";
-import { basename, dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { basename } from "node:path";
 import pc from "picocolors";
 import type { IngestConfig } from "./config.js";
 import { printMarkdown } from "./markdown.js";
@@ -12,38 +10,6 @@ import {
   SYSTEM_PROMPT,
 } from "./prompts.js";
 import type { PendingFile } from "./scanner.js";
-
-// Resolve the bundled hook script. The script lives in the source tree at
-// `src/hooks/block-edit-replace-all.cjs` and is copied to `dist/` at build
-// time via tsup's `publicDir`. Try both layouts and pick whichever exists.
-const BLOCK_EDIT_REPLACE_ALL_CANDIDATES = [
-  // Source-tree layout (tsx / dev).
-  join(dirname(fileURLToPath(import.meta.url)), "hooks", "block-edit-replace-all.cjs"),
-  // Bundled dist layout (tsup publicDir flattens into outDir).
-  join(dirname(fileURLToPath(import.meta.url)), "block-edit-replace-all.cjs"),
-];
-function findHookScript(): string {
-  for (const p of BLOCK_EDIT_REPLACE_ALL_CANDIDATES) {
-    if (existsSync(p)) return p;
-  }
-  throw new Error(
-    `block-edit-replace-all.cjs not found; tried ${BLOCK_EDIT_REPLACE_ALL_CANDIDATES.join(", ")}`,
-  );
-}
-
-// Inline JSON passed to `claude --settings` (which accepts either a file
-// path or a JSON string). Built at module load with the resolved absolute
-// path of the hook script baked in — no temp file needed.
-const INGEST_CLAUDE_SETTINGS_JSON = JSON.stringify({
-  hooks: {
-    PreToolUse: [
-      {
-        matcher: "Edit",
-        hooks: [{ type: "command", command: `node ${findHookScript()}` }],
-      },
-    ],
-  },
-});
 
 export type ClaudeRunOpts = {
   orgRoot: string;
@@ -117,7 +83,6 @@ export async function invokeClaude(opts: ClaudeRunOpts): Promise<ClaudeResult> {
     ];
     if (systemPrompt) args.push("--system-prompt", systemPrompt);
     if (opts.resumeSessionId) args.push("--resume", opts.resumeSessionId);
-    args.push("--settings", INGEST_CLAUDE_SETTINGS_JSON);
 
     const child = spawn("claude", args, {
       cwd: opts.orgRoot,
