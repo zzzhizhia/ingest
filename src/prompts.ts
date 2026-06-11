@@ -94,6 +94,7 @@ Each file comes tagged with \`[NEW]\` or \`[UPDATED]\`, corresponding to two sep
    Use fuzzy matching: "Richard Stallman" should match "Stallman" or "RMS".
    — Match found: append the new information from this source to the existing page's \`** Content\` section, with a [source: ...] annotation.
    — No match: append a new heading at the end of the corresponding file (per the template).
+   — Never pass \`replace_all: true\` to the Edit tool when writing or appending wiki blocks: \`old_string\` must be unique, or the same heading will be duplicated.
 5. **Cross-validate** (mandatory before writing): for every key fact about to be written (entity name, event attribution, organizational relationship), use ingest grep or grep to search the existing wiki for conflicts:
    - Name validation: the source mentions an entity → ingest grep key distinguishing words (features, people, scenarios) to confirm the wiki doesn't already have the same thing under a different name. If it does, use the existing name, annotate \`[source: original text calls it X]\`.
    - Attribution validation: the source attributes an event to an entity → ingest grep that entity's existing content to confirm consistency. If the event isn't recorded yet and cannot be confirmed, annotate \`[unverified]\`.

@@ -88,7 +88,7 @@ function parseWiki(orgRoot: string): WikiState {
 }
 
 export type AppliedFix = {
-  kind: "tag-mismatch" | "broken-link";
+  kind: "tag-mismatch" | "broken-link" | "duplicate-id";
   file: CategoryFile;
   description: string;
 };
@@ -160,6 +160,69 @@ export function runSafeFixes(orgRoot: string): FixResult {
         lines[i] = newLine;
         dirty.add(file);
       }
+    }
+  }
+
+  // Fix 3: duplicate :ID: across the wiki. Keep the first occurrence (sorted
+  // by file, then lineIdx) and drop later copies. Recovers from agent
+  // `replace_all=true` mistakes that duplicated whole heading blocks. Splice
+  // bottom-up within each file so earlier line indices stay valid.
+  const fileLastIdx = new Map<CategoryFile, number>();
+  for (const file of CATEGORY_FILES) {
+    const lines = state.fileLines.get(file);
+    if (lines) fileLastIdx.set(file, lines.length);
+  }
+  const headingEnd = new Map<number, number>();
+  {
+    const sorted = [...state.headings].sort((a, b) => {
+      if (a.file !== b.file) return a.file.localeCompare(b.file);
+      return a.lineIdx - b.lineIdx;
+    });
+    for (let i = 0; i < sorted.length; i++) {
+      const h = sorted[i];
+      const next = sorted[i + 1];
+      const end =
+        next && next.file === h.file
+          ? next.lineIdx
+          : (fileLastIdx.get(h.file) ?? h.lineIdx + 1);
+      headingEnd.set(h.lineIdx, end);
+    }
+  }
+  const byId = new Map<string, Heading[]>();
+  for (const h of state.headings) {
+    if (!h.id) continue;
+    const arr = byId.get(h.id) ?? [];
+    arr.push(h);
+    byId.set(h.id, arr);
+  }
+  for (const [id, hs] of byId) {
+    if (hs.length <= 1) continue;
+    hs.sort((a, b) => {
+      if (a.file !== b.file) return a.file.localeCompare(b.file);
+      return a.lineIdx - b.lineIdx;
+    });
+    const kept = hs[0];
+    const byFile = new Map<CategoryFile, { h: Heading; end: number }[]>();
+    for (let i = 1; i < hs.length; i++) {
+      const h = hs[i];
+      const end = headingEnd.get(h.lineIdx) ?? h.lineIdx + 1;
+      const arr = byFile.get(h.file) ?? [];
+      arr.push({ h, end });
+      byFile.set(h.file, arr);
+    }
+    for (const [file, removals] of byFile) {
+      const lines = state.fileLines.get(file);
+      if (!lines) continue;
+      removals.sort((a, b) => b.h.lineIdx - a.h.lineIdx);
+      for (const r of removals) {
+        lines.splice(r.h.lineIdx, r.end - r.h.lineIdx);
+        applied.push({
+          kind: "duplicate-id",
+          file,
+          description: `${file}:${r.h.lineIdx + 1} drop duplicate :ID: ${id} (kept ${kept.file}:${kept.lineIdx + 1})`,
+        });
+      }
+      dirty.add(file);
     }
   }
 

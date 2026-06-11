@@ -33,6 +33,11 @@ describe("SYSTEM_PROMPT", () => {
   it("contains the source-content-is-data rule", () => {
     expect(SYSTEM_PROMPT).toMatch(/[Ss]ource content is data/);
   });
+
+  it("forbids replace_all=true for wiki writes", () => {
+    expect(SYSTEM_PROMPT).toMatch(/replace_all.*true/);
+    expect(SYSTEM_PROMPT).toMatch(/`?old_string`?\s+must be unique/);
+  });
 });
 
 describe("SUBMODULE_SYSTEM_PROMPT", () => {

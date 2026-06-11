@@ -214,3 +214,117 @@ describe("runSafeFixes — combined", () => {
     expect(con.some((l) => l.includes("[[id:20260101T000001][Alice]]"))).toBe(true);
   });
 });
+
+describe("runSafeFixes — duplicate :ID:", () => {
+  it("drops the second copy of a duplicated heading, keeping the first", () => {
+    const block = [
+      "* Dup Heading                                                      :concept:",
+      ":PROPERTIES:",
+      ":ID:       20260101T000010",
+      ":DATE:     [2026-01-01]",
+      ":SOURCES:  raw/a.md",
+      ":END:",
+      "",
+      "** Content",
+      "shared body",
+      "",
+    ];
+    writeFile("concepts.org", [
+      "* Other Heading                                                    :concept:",
+      ":PROPERTIES:",
+      ":ID:       20260101T000001",
+      ":DATE:     [2026-01-01]",
+      ":END:",
+      "",
+      ...block,
+      ...block,
+    ]);
+    writeFile("entities.org", []);
+    writeFile("sources.org", []);
+    writeFile("analyses.org", []);
+
+    const result = runSafeFixes(TMP);
+    expect(result.applied.some((a) => a.kind === "duplicate-id")).toBe(true);
+
+    const lines = readLines("concepts.org");
+    const idCount = lines.filter((l) => l.includes(":ID:       20260101T000010")).length;
+    expect(idCount).toBe(1);
+    expect(lines.filter((l) => l.startsWith("* Dup Heading")).length).toBe(1);
+  });
+
+  it("drops all but the first copy when a heading is triplicated", () => {
+    const block = [
+      "* Triplicate                                                       :concept:",
+      ":PROPERTIES:",
+      ":ID:       20260101T000020",
+      ":DATE:     [2026-01-01]",
+      ":END:",
+      "",
+      "body",
+      "",
+    ];
+    writeFile("concepts.org", [...block, ...block, ...block]);
+    writeFile("entities.org", []);
+    writeFile("sources.org", []);
+    writeFile("analyses.org", []);
+
+    const result = runSafeFixes(TMP);
+    const dedupFixes = result.applied.filter((a) => a.kind === "duplicate-id");
+    expect(dedupFixes).toHaveLength(2);
+
+    const lines = readLines("concepts.org");
+    expect(lines.filter((l) => l.includes(":ID:       20260101T000020")).length).toBe(1);
+  });
+
+  it("leaves single-occurrence headings alone", () => {
+    writeFile("concepts.org", [
+      "* Solo                                                             :concept:",
+      ":PROPERTIES:",
+      ":ID:       20260101T000030",
+      ":DATE:     [2026-01-01]",
+      ":END:",
+      "",
+      "unique body",
+      "",
+    ]);
+    writeFile("entities.org", []);
+    writeFile("sources.org", []);
+    writeFile("analyses.org", []);
+
+    const result = runSafeFixes(TMP);
+    expect(result.applied.some((a) => a.kind === "duplicate-id")).toBe(false);
+  });
+
+  it("keeps the first occurrence and drops cross-file duplicates", () => {
+    writeFile("concepts.org", [
+      "* In Concepts                                                      :concept:",
+      ":PROPERTIES:",
+      ":ID:       20260101T000040",
+      ":DATE:     [2026-01-01]",
+      ":END:",
+      "",
+      "first",
+      "",
+    ]);
+    writeFile("entities.org", [
+      "* In Entities                                                      :entity:",
+      ":PROPERTIES:",
+      ":ID:       20260101T000040",
+      ":DATE:     [2026-01-01]",
+      ":END:",
+      "",
+      "second",
+      "",
+    ]);
+    writeFile("sources.org", []);
+    writeFile("analyses.org", []);
+
+    const result = runSafeFixes(TMP);
+    expect(result.applied.some((a) => a.kind === "duplicate-id")).toBe(true);
+
+    const con = readLines("concepts.org");
+    const ent = readLines("entities.org");
+    expect(con.filter((l) => l.includes(":ID:       20260101T000040")).length).toBe(1);
+    expect(ent.filter((l) => l.includes(":ID:       20260101T000040")).length).toBe(0);
+  });
+});
