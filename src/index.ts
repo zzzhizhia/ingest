@@ -27,6 +27,22 @@ import { cmdSubAdd, cmdSubList, cmdSubNew, cmdSubRemove } from "./sub.js";
 import { cmdGrep } from "./grep.js";
 import { cmdSchedule, deferIngest, parseDelay } from "./schedule.js";
 import { cmdSync } from "./sync.js";
+import { addRun, findLatestResumable, getRun, readRuns, ulid, updateRun, type RunRecord } from "./runs.js";
+
+// ── run tracking (history / resume) ───────────────────────────────────────────
+
+let currentRunId: string | null = null;
+const markInterrupted = () => {
+  if (!currentRunId) return;
+  try {
+    updateRun(currentRunId, {
+      status: "interrupted",
+      finishedAt: new Date().toISOString(),
+    });
+  } catch {}
+};
+process.on("SIGINT", markInterrupted);
+process.on("SIGTERM", markInterrupted);
 
 // ── withQuit ──────────────────────────────────────────────────────────────────
 
@@ -123,6 +139,9 @@ ${pc.bold("Usage")}
   ingest export --list       list all wiki pages (id, category, title)
   ingest schedule            list pending scheduled jobs
   ingest schedule cancel     cancel all (or cancel <pid>)
+  ingest history             list past ingest runs
+  ingest history <id>        show run details
+  ingest resume [id]         resume an interrupted run (latest if no id)
   ingest man                 show full manual
 
 ${pc.bold("Options")}
@@ -427,6 +446,118 @@ function cmdSub(positional: string[]): void {
   process.exit(1);
 }
 
+// ── history / resume ──────────────────────────────────────────────────────────
+
+function statusLabel(s: RunRecord["status"]): string {
+  if (s === "completed") return pc.green(s);
+  if (s === "interrupted") return pc.yellow(s);
+  return pc.cyan(s);
+}
+
+function printRunDetail(r: RunRecord): void {
+  console.log(pc.bold(`Run ${r.id}`));
+  console.log(`  ${pc.dim("Started:")}  ${r.startedAt}`);
+  if (r.finishedAt) console.log(`  ${pc.dim("Finished:")} ${r.finishedAt}`);
+  console.log(`  ${pc.dim("Status:")}   ${r.status}`);
+  console.log(`  ${pc.dim("Wiki:")}     ${r.wikiRoot}`);
+  if (r.mainSessionId) console.log(`  ${pc.dim("Session:")}  ${r.mainSessionId}`);
+}
+
+function cmdHistory(args: string[], positional: string[]): void {
+  const targetId = positional[1];
+  const lastRaw = getOpt(args, "--last");
+  const lastN = lastRaw ? parseInt(lastRaw, 10) : undefined;
+  const statusRaw = getOpt(args, "--status");
+  const statusFilter = statusRaw
+    ? (statusRaw.split(",").map((s) => s.trim()) as RunRecord["status"][])
+    : undefined;
+
+  const file = readRuns();
+
+  if (targetId) {
+    const r = file.runs.find((x) => x.id === targetId);
+    if (!r) {
+      console.error(pc.red("✗") + ` no run with id ${targetId}`);
+      process.exit(1);
+    }
+    printRunDetail(r);
+    return;
+  }
+
+  let runs = file.runs;
+  if (statusFilter) runs = runs.filter((r) => statusFilter.includes(r.status));
+  runs = [...runs].sort((a, b) => b.startedAt.localeCompare(a.startedAt));
+  if (lastN && lastN > 0) runs = runs.slice(0, lastN);
+
+  if (runs.length === 0) {
+    console.log(pc.dim("no runs"));
+    return;
+  }
+
+  for (const r of runs) {
+    console.log(`${r.id}  ${r.startedAt}  ${statusLabel(r.status)}  ${pc.dim(r.wikiRoot)}`);
+  }
+}
+
+async function cmdResume(positional: string[]): Promise<void> {
+  const orgRoot = findOrgRoot(process.cwd());
+  const targetId = positional[1];
+  const run = targetId ? getRun(targetId) : findLatestResumable(orgRoot);
+
+  if (!run) {
+    console.error(pc.red("✗") + " no in-progress or interrupted run found");
+    console.error(pc.dim("  run 'ingest history' to see all runs"));
+    process.exit(1);
+  }
+
+  if (run.wikiRoot !== orgRoot) {
+    console.error(pc.red("✗") + ` run ${run.id} belongs to a different wiki`);
+    console.error(pc.dim(`  run:  ${run.wikiRoot}`));
+    console.error(pc.dim(`  here: ${orgRoot}`));
+    process.exit(1);
+  }
+
+  if (run.status === "completed") {
+    console.error(pc.red("✗") + ` run ${run.id} is already completed`);
+    process.exit(1);
+  }
+
+  if (!run.mainSessionId) {
+    console.error(pc.red("✗") + ` run ${run.id} has no claude session id`);
+    console.error(pc.dim("  re-run 'ingest' to start fresh"));
+    process.exit(1);
+  }
+
+  const config = readConfig(orgRoot);
+  currentRunId = run.id;
+  try {
+    console.log(
+      pc.dim(`resuming run ${run.id} (session ${run.mainSessionId.slice(0, 8)}...)`),
+    );
+    const result = await invokeClaude({
+      orgRoot,
+      prompt: "continue",
+      label: "resuming",
+      doneLabel: "resumed",
+      config,
+      resumeSessionId: run.mainSessionId,
+    });
+    if (!result.ok) {
+      try {
+        updateRun(run.id, { status: "interrupted", finishedAt: new Date().toISOString() });
+      } catch {}
+      console.error(pc.red("✗") + " claude exited with non-zero status");
+      process.exit(1);
+    }
+    try {
+      updateRun(run.id, { status: "completed", finishedAt: new Date().toISOString() });
+    } catch {}
+    console.log(pc.green("✓") + " resumed");
+  } finally {
+    currentRunId = null;
+  }
+}
+
 // ── main ingest flow ──────────────────────────────────────────────────────────
 
 async function cmdIngest(args: string[]): Promise<void> {
@@ -518,17 +649,29 @@ async function cmdIngest(args: string[]): Promise<void> {
     }
   }
 
+  // ── start tracking this run (for history / resume) ──
+  const runId = addRun({
+    id: ulid(),
+    startedAt: new Date().toISOString(),
+    status: "in-progress",
+    wikiRoot: orgRoot,
+  }).id;
+  currentRunId = runId;
+  try {
+
   // ── run Claude: main repo files ──
   let mainOutput = "";
   let mainSessionId = "";
   if (mainFiles.length > 0) {
     const result = await runClaude(orgRoot, mainFiles, convertedMap, config);
     if (!result.ok) {
+      try { updateRun(runId, { status: "interrupted", finishedAt: new Date().toISOString() }); } catch {}
       console.error(pc.red("✗") + " claude exited with non-zero status");
       process.exit(1);
     }
     mainOutput = result.output;
     mainSessionId = result.sessionId;
+    try { updateRun(runId, { mainSessionId }); } catch {}
   }
 
   // ── run Claude: subwiki files (parallel across subwikis) ──
@@ -542,6 +685,7 @@ async function cmdIngest(args: string[]): Promise<void> {
     );
     for (const { smRoot, ok } of results) {
       if (!ok) {
+        try { updateRun(runId, { status: "interrupted", finishedAt: new Date().toISOString() }); } catch {}
         console.error(pc.red("✗") + ` claude exited with non-zero status (${basename(smRoot)})`);
         process.exit(1);
       }
@@ -584,6 +728,7 @@ async function cmdIngest(args: string[]): Promise<void> {
   try {
     result = commitIngest(orgRoot, mainFilePaths, committedSubmodules, mainOutput);
   } catch (e) {
+    try { updateRun(runId, { status: "interrupted", finishedAt: new Date().toISOString() }); } catch {}
     console.warn(pc.yellow("⚠") + " git commit failed:", (e as Error).message);
     gitPush(orgRoot);
     return;
@@ -605,6 +750,7 @@ async function cmdIngest(args: string[]): Promise<void> {
       try {
         result = commitIngest(orgRoot, mainFilePaths, committedSubmodules, mainOutput);
       } catch (e) {
+        try { updateRun(runId, { status: "interrupted", finishedAt: new Date().toISOString() }); } catch {}
         console.warn(pc.yellow("⚠") + " git commit failed:", (e as Error).message);
         gitPush(orgRoot);
         return;
@@ -620,6 +766,7 @@ async function cmdIngest(args: string[]): Promise<void> {
     try {
       result = commitIngest(orgRoot, mainFilePaths, committedSubmodules, mainOutput);
     } catch (e) {
+      try { updateRun(runId, { status: "interrupted", finishedAt: new Date().toISOString() }); } catch {}
       console.warn(pc.yellow("⚠") + " git commit failed:", (e as Error).message);
       gitPush(orgRoot);
       return;
@@ -627,6 +774,7 @@ async function cmdIngest(args: string[]): Promise<void> {
   }
 
   if (!result.ok) {
+    try { updateRun(runId, { status: "interrupted", finishedAt: new Date().toISOString() }); } catch {}
     console.error(pc.red("✗") + " git commit still failing after fix attempts:");
     for (const line of result.error.split("\n")) {
       console.error(pc.dim("  " + line));
@@ -634,8 +782,12 @@ async function cmdIngest(args: string[]): Promise<void> {
     process.exit(1);
   }
 
+  try { updateRun(runId, { status: "completed", finishedAt: new Date().toISOString() }); } catch {}
   console.log(pc.green("✓") + " done");
   gitPush(orgRoot);
+  } finally {
+    currentRunId = null;
+  }
 }
 
 // ── main ──────────────────────────────────────────────────────────────────────
@@ -658,7 +810,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  const VALUED_FLAGS = new Set(["--at", "--depth", "--output", "--output-root", "--strategy"]);
+  const VALUED_FLAGS = new Set(["--at", "--depth", "--output", "--output-root", "--strategy", "--last", "--status"]);
   const positional: string[] = [];
   const flags: string[] = [];
   for (let i = 0; i < args.length; i++) {
@@ -670,11 +822,12 @@ async function main(): Promise<void> {
     }
   }
 
-  const SUBCOMMANDS = new Set(["status", "init", "forget", "lock", "lint", "query", "grep", "rg", "export", "sub", "sync", "schedule", "man"]);
+  const SUBCOMMANDS = new Set(["status", "init", "forget", "lock", "lint", "query", "grep", "rg", "export", "sub", "sync", "schedule", "history", "resume", "man"]);
   const GLOBAL_FLAGS = new Set(["-a", "--all", "--at", "--no-pull", "-V", "--version"]);
   const EXPORT_FLAGS = new Set(["--depth", "--backlinks", "--output", "--output-root", "--open", "--list"]);
   const LINT_FLAGS = new Set(["--fix"]);
   const SYNC_FLAGS = new Set(["--one-way", "--non-interactive", "--strategy"]);
+  const HISTORY_FLAGS = new Set(["--last", "--status"]);
 
   if (positional[0] === "man") return cmdMan();
   if (positional[0] === "status") return cmdStatus();
@@ -691,6 +844,8 @@ async function main(): Promise<void> {
   if (positional[0] === "sub") return cmdSub(positional);
   if (positional[0] === "sync") return cmdSync(args, positional);
   if (positional[0] === "schedule") return cmdSchedule(positional);
+  if (positional[0] === "history") return cmdHistory(args, positional);
+  if (positional[0] === "resume") return cmdResume(positional);
 
   if (positional[0] && !SUBCOMMANDS.has(positional[0]) && !existsSync(positional[0])) {
     console.error(pc.red("✗") + ` unknown command: ${positional[0]}`);
@@ -702,6 +857,7 @@ async function main(): Promise<void> {
   if (positional[0] === "export") for (const f of EXPORT_FLAGS) validFlags.add(f);
   if (positional[0] === "lint") for (const f of LINT_FLAGS) validFlags.add(f);
   if (positional[0] === "sync") for (const f of SYNC_FLAGS) validFlags.add(f);
+  if (positional[0] === "history") for (const f of HISTORY_FLAGS) validFlags.add(f);
 
   for (const f of flags) {
     const name = f.includes("=") ? f.slice(0, f.indexOf("=")) : f;

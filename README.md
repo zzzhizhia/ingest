@@ -75,6 +75,16 @@ ingest grep "^Claude$"
 # Export a wiki page and its linked neighborhood as HTML
 ingest export <id> [--depth N] [--backlinks] [--output PATH] [--open]
 ingest export --list
+
+# List past ingest runs (state in $XDG_STATE_HOME/ingest/runs.json)
+ingest history
+ingest history --last 5
+ingest history --status interrupted,completed
+ingest history 01HXYZW...
+
+# Resume the most recent interrupted run (reuses the original claude session)
+ingest resume
+ingest resume 01HXYZW...
 ```
 
 ## Options
@@ -91,6 +101,8 @@ ingest export --list
 | `--output-root D` | Directory for export with auto Denote-style filename |
 | `--open` | Open exported HTML in browser |
 | `--fix` | Apply safe auto-fixes (used with `lint`) |
+| `--last N` | Show only the last N runs (used with `history`) |
+| `--status S` | Filter by status: `in-progress`, `completed`, `interrupted` (used with `history`) |
 
 ## Knowledge Base Structure
 
@@ -154,6 +166,18 @@ Key properties:
 **Source files** under `raw/` are immutable -- ingest never modifies them. They use [Denote naming](https://protesilaos.com/emacs/denote): `{YYYYMMDDTHHMMSS}--{title}__{tags}.ext`.
 
 **Subwiki knowledge bases** under `subs/` are fully independent: own category files, own raw/, own git history. Useful for team/project wikis with different access permissions.
+
+## History & Resume
+
+Every `ingest` run is recorded in `$XDG_STATE_HOME/ingest/runs.json` (machine-local, not version-controlled):
+
+- `ingest history` — list all runs, most recent first
+- `ingest history <id>` — show a run's session id, wiki, and timing
+- `ingest history --last N` / `--status interrupted,completed` — narrow the list
+
+If a run is interrupted (Ctrl+C, crash, network drop), `ingest resume` re-invokes Claude with `--resume <session-id> "continue"`. Claude's session already knows which sources it had been processing, which headings it had created, and which ones were still pending — so a one-word prompt is enough to pick up where it left off. The wiki does not need to be re-scanned and files are not re-listed.
+
+`ingest resume` accepts an explicit run id; with no id it picks the most recent in-progress or interrupted run for the current wiki. The session id is only retained while Claude's own session log is alive (~30 days) — older runs fall back to a fresh `ingest` run.
 
 ## Full Flow
 

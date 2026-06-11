@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- `ingest history` subcommand — list past ingest runs with `--last N` and `--status` filters; show details with `ingest history <id>`
+- `ingest resume [id]` subcommand — resume an interrupted run by replaying the original Claude session with `--resume <session-id> "continue"`; defaults to the latest in-progress or interrupted run for the current wiki
+- Run state persisted to `$XDG_STATE_HOME/ingest/runs.json` (machine-local, not version-controlled); survives Ctrl+C via SIGINT/SIGTERM hooks that mark the active run as `interrupted`
+- New `src/runs.ts` module: ULID-based run ids, XDG-state storage, `readRuns` / `addRun` / `updateRun` / `findLatestResumable` / `getRun` API
+- 15 vitest assertions in `runs.test.ts` covering ulid format, XDG path resolution, file round-trip, addRun accumulation, updateRun merge, findLatestResumable priority + sort
+
 ## [1.6.0] - 2026-06-06
 
 ### Added
