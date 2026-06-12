@@ -9,6 +9,7 @@ import {
   readRuns,
   type RunRecord,
   runsPath,
+  setRunStatus,
   ulid,
   updateRun,
 } from "../runs.js";
@@ -106,6 +107,55 @@ describe("addRun / updateRun", () => {
 describe("getRun", () => {
   it("returns undefined for unknown id", () => {
     expect(getRun("missing")).toBeUndefined();
+  });
+});
+
+describe("setRunStatus", () => {
+  function rec(over: Partial<RunRecord>): RunRecord {
+    return {
+      id: ulid(),
+      startedAt: "2026-01-01T00:00:00.000Z",
+      status: "in-progress",
+      wikiRoot: "/w",
+      mainSessionId: "sess-default",
+      ...over,
+    };
+  }
+
+  it("stamps status and finishedAt", () => {
+    addRun(rec({ id: "a" }));
+    setRunStatus("a", "interrupted");
+    const r = getRun("a")!;
+    expect(r.status).toBe("interrupted");
+    expect(r.finishedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  });
+
+  it("preserves mainSessionId by default", () => {
+    addRun(rec({ id: "a" }));
+    setRunStatus("a", "completed");
+    expect(getRun("a")?.mainSessionId).toBe("sess-default");
+  });
+
+  it("sets mainSessionId when provided", () => {
+    addRun(rec({ id: "a" }));
+    setRunStatus("a", "interrupted", { mainSessionId: "sess-new" });
+    expect(getRun("a")?.mainSessionId).toBe("sess-new");
+  });
+
+  it("ignores empty mainSessionId (preserves existing)", () => {
+    addRun(rec({ id: "a" }));
+    setRunStatus("a", "interrupted", { mainSessionId: "" });
+    expect(getRun("a")?.mainSessionId).toBe("sess-default");
+  });
+
+  it("clears mainSessionId when clearMainSessionId is true", () => {
+    addRun(rec({ id: "a" }));
+    setRunStatus("a", "interrupted", { clearMainSessionId: true });
+    expect(getRun("a")?.mainSessionId).toBeUndefined();
+  });
+
+  it("does not throw on unknown run id (silently swallows)", () => {
+    expect(() => setRunStatus("missing", "interrupted")).not.toThrow();
   });
 });
 

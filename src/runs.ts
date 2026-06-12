@@ -4,8 +4,10 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 
 function stateDir(): string {
+  // `||` (not `??`) so an explicitly-empty `XDG_STATE_HOME=` falls back to the
+  // default. An empty string would produce a CWD-relative "ingest" path.
   return join(
-    process.env.XDG_STATE_HOME ?? join(homedir(), ".local", "state"),
+    process.env.XDG_STATE_HOME || join(homedir(), ".local", "state"),
     "ingest",
   );
 }
@@ -113,6 +115,44 @@ export function updateRun(id: string, patch: Partial<RunRecord>): void {
   persist(file);
 }
 
+/**
+ * Persist a run-state transition with a single helper. Replaces the
+ * 3-line `try { updateRun(...) } catch {}` pattern that was duplicated
+ * across cmdIngest and cmdResume. Errors are silently swallowed -- a
+ * failed disk write must not crash the calling flow; the worst case is
+ * a stale runs.json entry that `findLatestResumable` will eventually
+ * drop via the mainSessionId filter.
+ *
+ * @param opts.mainSessionId       When set (and non-empty), include the
+ *                                 value in the patch. Empty/undefined
+ *                                 values are dropped, preserving any
+ *                                 existing mainSessionId.
+ * @param opts.clearMainSessionId  When true, explicitly include
+ *                                 `mainSessionId: undefined` in the
+ *                                 patch, so the JSON serialization
+ *                                 drops the field. Use this when the
+ *                                 run can no longer be resumed (e.g.
+ *                                 the fix loop was exhausted).
+ */
+export function setRunStatus(
+  runId: string,
+  status: RunStatus,
+  opts?: { mainSessionId?: string; clearMainSessionId?: boolean },
+): void {
+  try {
+    const patch: Partial<RunRecord> = {
+      status,
+      finishedAt: new Date().toISOString(),
+    };
+    if (opts?.clearMainSessionId) {
+      patch.mainSessionId = undefined;
+    } else if (opts?.mainSessionId) {
+      patch.mainSessionId = opts.mainSessionId;
+    }
+    updateRun(runId, patch);
+  } catch {}
+}
+
 export function getRun(id: string): RunRecord | undefined {
   return readRuns().runs.find((r) => r.id === id);
 }
@@ -142,7 +182,8 @@ export function findLatestResumable(wikiRoot?: string): RunRecord | undefined {
   resumable.sort((a, b) => {
     const r = rank[a.status] - rank[b.status];
     if (r !== 0) return r;
-    return b.startedAt.localeCompare(a.startedAt);
+    // ISO-8601 is lexically sortable; avoid localeCompare's per-call locale lookup
+    return a.startedAt < b.startedAt ? 1 : a.startedAt > b.startedAt ? -1 : 0;
   });
   return resumable[0];
 }

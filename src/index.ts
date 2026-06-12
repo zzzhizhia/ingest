@@ -1,7 +1,6 @@
 import { checkbox } from "@inquirer/prompts";
 import { execFileSync } from "node:child_process";
-import { existsSync } from "node:fs";
-import { realpathSync } from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
 import { basename, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import pc from "picocolors";
@@ -27,22 +26,21 @@ import { cmdSubAdd, cmdSubList, cmdSubNew, cmdSubRemove } from "./sub.js";
 import { cmdGrep } from "./grep.js";
 import { cmdSchedule, deferIngest, parseDelay } from "./schedule.js";
 import { cmdSync } from "./sync.js";
-import { addRun, findLatestResumable, getRun, readRuns, ulid, updateRun, type RunRecord } from "./runs.js";
+import { addRun, findLatestResumable, getRun, readRuns, setRunStatus, ulid, updateRun, type RunRecord } from "./runs.js";
 
 // ── run tracking (history / resume) ───────────────────────────────────────────
 
 let currentRunId: string | null = null;
 const markInterrupted = () => {
   if (!currentRunId) return;
+  // Skip if the run already reached a terminal state -- otherwise a late
+  // SIGINT (after the success path wrote 'completed') would clobber it.
   try {
-    updateRun(currentRunId, {
-      status: "interrupted",
-      finishedAt: new Date().toISOString(),
-    });
+    const run = getRun(currentRunId);
+    if (!run || run.status !== "in-progress") return;
+    setRunStatus(currentRunId, "interrupted");
   } catch {}
 };
-process.on("SIGINT", markInterrupted);
-process.on("SIGTERM", markInterrupted);
 
 // ── withQuit ──────────────────────────────────────────────────────────────────
 
@@ -66,7 +64,9 @@ function findOrgRoot(start: string): string {
   let dir = resolve(start);
   while (true) {
     if (existsSync(join(dir, "ingest-lock.json"))) {
-      return dir;
+      // realpathSync canonicalizes symlinks (/var → /private/var on macOS) so
+      // stored wikiRoot values match across sessions regardless of cwd form.
+      return realpathSync(dir);
     }
     const parent = resolve(dir, "..");
     if (parent === dir) {
@@ -356,6 +356,10 @@ async function cmdQuery(positional: string[]): Promise<void> {
     captureOutput: true,
   });
   if (!result.ok) {
+    if (result.aborted) {
+      console.error(pc.red("✗") + " aborted by user");
+      process.exit(130);
+    }
     console.error(pc.red("✗") + " query failed");
     process.exit(1);
   }
@@ -463,14 +467,34 @@ function printRunDetail(r: RunRecord): void {
   if (r.mainSessionId) console.log(`  ${pc.dim("Session:")}  ${r.mainSessionId}`);
 }
 
+const VALID_RUN_STATUSES: readonly RunRecord["status"][] = [
+  "in-progress",
+  "completed",
+  "interrupted",
+];
+
 function cmdHistory(args: string[], positional: string[]): void {
   const targetId = positional[1];
   const lastRaw = getOpt(args, "--last");
-  const lastN = lastRaw ? parseInt(lastRaw, 10) : undefined;
+  let lastN: number | undefined;
+  if (lastRaw !== undefined) {
+    lastN = parseInt(lastRaw, 10);
+    if (!Number.isFinite(lastN) || lastN < 0) {
+      console.error(pc.red("✗") + ` invalid --last value: ${lastRaw}`);
+      process.exit(1);
+    }
+  }
   const statusRaw = getOpt(args, "--status");
-  const statusFilter = statusRaw
-    ? (statusRaw.split(",").map((s) => s.trim()) as RunRecord["status"][])
-    : undefined;
+  let statusFilter: RunRecord["status"][] | undefined;
+  if (statusRaw !== undefined) {
+    statusFilter = statusRaw.split(",").map((s) => s.trim()) as RunRecord["status"][];
+    const invalid = statusFilter.filter((s) => !VALID_RUN_STATUSES.includes(s));
+    if (invalid.length > 0) {
+      console.error(pc.red("✗") + ` invalid --status value(s): ${invalid.join(", ")}`);
+      console.error(pc.dim(`  valid: ${VALID_RUN_STATUSES.join(", ")}`));
+      process.exit(1);
+    }
+  }
 
   const file = readRuns();
 
@@ -485,8 +509,11 @@ function cmdHistory(args: string[], positional: string[]): void {
   }
 
   let runs = file.runs;
-  if (statusFilter) runs = runs.filter((r) => statusFilter.includes(r.status));
-  runs = [...runs].sort((a, b) => b.startedAt.localeCompare(a.startedAt));
+  if (statusFilter) runs = runs.filter((r) => statusFilter!.includes(r.status));
+  // ISO-8601 is lexically sortable; plain < avoids localeCompare's per-call lookup
+  runs = [...runs].sort((a, b) =>
+    a.startedAt < b.startedAt ? 1 : a.startedAt > b.startedAt ? -1 : 0,
+  );
   if (lastN && lastN > 0) runs = runs.slice(0, lastN);
 
   if (runs.length === 0) {
@@ -545,25 +572,15 @@ async function cmdResume(positional: string[]): Promise<void> {
     if (result.aborted) {
       // Persist any partial sessionId so a later resume can pick up where we
       // left off -- parseClaudeJson may have decoded it from the buffer.
-      try {
-        updateRun(run.id, {
-          ...(result.sessionId ? { mainSessionId: result.sessionId } : {}),
-          status: "interrupted",
-          finishedAt: new Date().toISOString(),
-        });
-      } catch {}
+      setRunStatus(run.id, "interrupted", { mainSessionId: result.sessionId });
       process.exit(130);
     }
     if (!result.ok) {
-      try {
-        updateRun(run.id, { status: "interrupted", finishedAt: new Date().toISOString() });
-      } catch {}
+      setRunStatus(run.id, "interrupted");
       console.error(pc.red("✗") + " claude exited with non-zero status");
       process.exit(1);
     }
-    try {
-      updateRun(run.id, { status: "completed", finishedAt: new Date().toISOString() });
-    } catch {}
+    setRunStatus(run.id, "completed");
     console.log(pc.green("✓") + " resumed");
   } finally {
     currentRunId = null;
@@ -677,17 +694,11 @@ async function cmdIngest(args: string[]): Promise<void> {
   if (mainFiles.length > 0) {
     const result = await runClaude(orgRoot, mainFiles, convertedMap, config);
     if (result.aborted) {
-      try {
-        updateRun(runId, {
-          ...(result.sessionId ? { mainSessionId: result.sessionId } : {}),
-          status: "interrupted",
-          finishedAt: new Date().toISOString(),
-        });
-      } catch {}
+      setRunStatus(runId, "interrupted", { mainSessionId: result.sessionId });
       process.exit(130);
     }
     if (!result.ok) {
-      try { updateRun(runId, { status: "interrupted", finishedAt: new Date().toISOString() }); } catch {}
+      setRunStatus(runId, "interrupted");
       console.error(pc.red("✗") + " claude exited with non-zero status");
       process.exit(1);
     }
@@ -705,19 +716,17 @@ async function cmdIngest(args: string[]): Promise<void> {
         return { smRoot, ok: res.ok, output: res.output, aborted: res.aborted, sessionId: res.sessionId };
       }),
     );
-    for (const { smRoot, ok, aborted, sessionId } of results) {
+    for (const { smRoot, ok, aborted, sessionId: _smSessionId } of results) {
       if (aborted) {
-        try {
-          updateRun(runId, {
-            ...(sessionId ? { mainSessionId: sessionId } : {}),
-            status: "interrupted",
-            finishedAt: new Date().toISOString(),
-          });
-        } catch {}
+        // Subwiki session ids are intentionally NOT persisted: resume only
+        // continues the main session, and overwriting the main sessionId
+        // (already saved above) with a subwiki's would resume the wrong
+        // conversation.
+        setRunStatus(runId, "interrupted");
         process.exit(130);
       }
       if (!ok) {
-        try { updateRun(runId, { status: "interrupted", finishedAt: new Date().toISOString() }); } catch {}
+        setRunStatus(runId, "interrupted");
         console.error(pc.red("✗") + ` claude exited with non-zero status (${basename(smRoot)})`);
         process.exit(1);
       }
@@ -760,7 +769,7 @@ async function cmdIngest(args: string[]): Promise<void> {
   try {
     result = commitIngest(orgRoot, mainFilePaths, committedSubmodules, mainOutput);
   } catch (e) {
-    try { updateRun(runId, { status: "interrupted", finishedAt: new Date().toISOString() }); } catch {}
+    setRunStatus(runId, "interrupted");
     console.warn(pc.yellow("⚠") + " git commit failed:", (e as Error).message);
     gitPush(orgRoot);
     return;
@@ -782,7 +791,7 @@ async function cmdIngest(args: string[]): Promise<void> {
       try {
         result = commitIngest(orgRoot, mainFilePaths, committedSubmodules, mainOutput);
       } catch (e) {
-        try { updateRun(runId, { status: "interrupted", finishedAt: new Date().toISOString() }); } catch {}
+        setRunStatus(runId, "interrupted");
         console.warn(pc.yellow("⚠") + " git commit failed:", (e as Error).message);
         gitPush(orgRoot);
         return;
@@ -790,15 +799,20 @@ async function cmdIngest(args: string[]): Promise<void> {
       if (result.ok) break;
     }
 
-    const fixOk = await runClaudeFix(orgRoot, result.error, mainFiles, config, mainSessionId);
-    if (!fixOk) {
+    const fixResult = await runClaudeFix(orgRoot, result.error, mainFiles, config, mainSessionId);
+    if (fixResult.aborted) {
+      console.error(pc.red("✗") + " aborted by user");
+      setRunStatus(runId, "interrupted");
+      process.exit(130);
+    }
+    if (!fixResult.ok) {
       console.error(pc.red("✗") + " claude fix exited with non-zero status");
       break;
     }
     try {
       result = commitIngest(orgRoot, mainFilePaths, committedSubmodules, mainOutput);
     } catch (e) {
-      try { updateRun(runId, { status: "interrupted", finishedAt: new Date().toISOString() }); } catch {}
+      setRunStatus(runId, "interrupted");
       console.warn(pc.yellow("⚠") + " git commit failed:", (e as Error).message);
       gitPush(orgRoot);
       return;
@@ -806,7 +820,10 @@ async function cmdIngest(args: string[]): Promise<void> {
   }
 
   if (!result.ok) {
-    try { updateRun(runId, { status: "interrupted", finishedAt: new Date().toISOString() }); } catch {}
+    // Clear mainSessionId so findLatestResumable skips this run -- it is no
+    // longer safe to resume a session that exhausted the fix loop, because
+    // the next 'continue' would just hit the same pre-commit-hook error.
+    setRunStatus(runId, "interrupted", { clearMainSessionId: true });
     console.error(pc.red("✗") + " git commit still failing after fix attempts:");
     for (const line of result.error.split("\n")) {
       console.error(pc.dim("  " + line));
@@ -814,7 +831,7 @@ async function cmdIngest(args: string[]): Promise<void> {
     process.exit(1);
   }
 
-  try { updateRun(runId, { status: "completed", finishedAt: new Date().toISOString() }); } catch {}
+  setRunStatus(runId, "completed");
   console.log(pc.green("✓") + " done");
   gitPush(orgRoot);
   } finally {
@@ -825,6 +842,11 @@ async function cmdIngest(args: string[]): Promise<void> {
 // ── main ──────────────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
+  // Register signal handlers here (not at module load) so test suites that
+  // import the module multiple times don't accumulate listeners on process.
+  process.on("SIGINT", markInterrupted);
+  process.on("SIGTERM", markInterrupted);
+
   process.stdout.on("error", (err) => {
     if ((err as NodeJS.ErrnoException).code === "EPIPE") process.exit(0);
     throw err;

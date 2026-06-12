@@ -204,7 +204,7 @@ export async function runClaudeFix(
   files: PendingFile[],
   config: IngestConfig,
   resumeSessionId: string,
-): Promise<boolean> {
+): Promise<{ ok: boolean; aborted: boolean }> {
   // No systemPrompt on resume: the session already carries the original one.
   // Sending a fresh system prompt on top of a resumed session confuses the
   // model about its role mid-conversation.
@@ -215,5 +215,5 @@ export async function runClaudeFix(
     config,
     resumeSessionId,
   });
-  return result.ok && !result.aborted;
+  return { ok: result.ok, aborted: result.aborted };
 }
