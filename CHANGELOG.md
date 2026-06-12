@@ -5,19 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [1.7.0] - 2026-06-12
 
 ### Added
 
-- `ingest history` subcommand — list past ingest runs with `--last N` and `--status` filters; show details with `ingest history <id>`
-- `ingest resume [id]` subcommand — resume an interrupted run by replaying the original Claude session with `--resume <session-id> "continue"`; defaults to the latest in-progress or interrupted run for the current wiki
-- Run state persisted to `$XDG_STATE_HOME/ingest/runs.json` (machine-local, not version-controlled); survives Ctrl+C via SIGINT/SIGTERM hooks that mark the active run as `interrupted`
-- New `src/runs.ts` module: ULID-based run ids, XDG-state storage, `readRuns` / `addRun` / `updateRun` / `findLatestResumable` / `getRun` API
-- 22 vitest assertions in `runs.test.ts` covering ulid format, XDG path resolution, file round-trip, addRun accumulation, updateRun merge, findLatestResumable priority + sort + sessionId filter
+- `ingest history` subcommand — list past ingest runs with `--last N` and `--status` filters; show details with `ingest history <id>`. State stored in `$XDG_STATE_HOME/ingest/runs.json` (machine-local, not version-controlled).
+- `ingest resume [id]` subcommand — resume an interrupted run by replaying the original Claude session with `--resume <session-id> "continue"`. Defaults to the latest in-progress or interrupted run for the current wiki. Claude's session already knows which sources it had been processing, so a one-word prompt picks up where it left off.
+- New `src/runs.ts` module: ULID-based run ids, XDG-state storage, `readRuns` / `addRun` / `updateRun` / `findLatestResumable` / `getRun` / `setRunStatus` API. ULIDs self-implemented to avoid a new dep.
+- 22 vitest assertions in `runs.test.ts` covering ulid format, XDG path resolution, file round-trip, addRun accumulation, updateRun merge, findLatestResumable priority + sort + sessionId filter, and the setRunStatus helper's four shapes.
 
 ### Fixed
 
-- **resume broke on SIGINT**: `claude.ts` was calling `process.exit(130)` in its close handler before the caller could persist the parsed `session_id`, so any Ctrl+C during the main ingest run left the run record with `status: "interrupted"` but no `mainSessionId` — making `ingest resume` reject it with "no claude session id". `invokeClaude` now resolves with a new `aborted: true` flag; `cmdIngest` and `cmdResume` persist the sessionId (if present in the buffer) before `process.exit(130)`. `findLatestResumable` now also filters out runs with no `mainSessionId` so stale unresumable records don't surface.
+- **Resume preserved org files on Ctrl+C** (`f2d0acf`): `claude.ts` was calling `process.exit(130)` in its close handler before the caller could persist the parsed `session_id`, so any Ctrl+C during the main ingest left the run record with `status: "interrupted"` but no `mainSessionId`. `invokeClaude` now resolves with a new `aborted: true` flag; `cmdIngest` and `cmdResume` persist the sessionId (when present in the buffer) before exiting. `findLatestResumable` filters out runs without a `mainSessionId` so stale unresumable records don't surface.
+- **Duplicate `:ID:` from Claude's `Edit replace_all`** (`6b41c48`): a real-world ingest hit the same `:ID:` stamp twice in `concepts.org` and the pre-commit hook caught it, but the recovery loop (`runClaudeFix`) took 20+ minutes. Defense-in-depth: a prompt guard tells the agent never to use `replace_all=true`, and `runSafeFixes` gains a `duplicate-id` kind that drops later copies in O(n) and recovers in <1s.
+- **Subwiki aborted branch was overwriting the main sessionId** (`61098cd`): the spread `(sessionId ? { mainSessionId: sessionId } : {})` in the subwiki parallel loop clobbered the previously-persisted main sessionId with the subwiki's. Resume would then re-invoke Claude on the wrong conversation. Subwiki session ids are no longer persisted at all.
+- **XDG_STATE_HOME="" bypassed the `??` fallback**: an explicitly-empty env var produced a CWD-relative `ingest/runs.json` path and stray files anywhere. Switched to `||` which falls back on empty strings.
+- **markInterrupted race vs cmdIngest success path**: a SIGINT arriving after the run was marked `completed` would clobber it back to `interrupted`. The handler now reads the current status and skips the write if the run is in a terminal state.
+- **findOrgRoot didn't resolve symlinks** — on macOS (`/var` → `/private/var`) the same wiki compared as a different one and `ingest resume` rejected valid runs. Added `realpathSync(dir)` on the success path.
+- **runClaudeFix returned a bare boolean**: an aborted fix pass was reported as `claude fix exited with non-zero` and then immediately fell through to `git commit still failing`. Changed to `{ ok, aborted }`; cmdIngest handles the abort with the correct exit code (130) and message.
+- **Fix-exhausted runs were marked "interrupted" with the original mainSessionId intact**: `ingest resume` would happily continue a session whose previous turn was the failed fix. Now clears mainSessionId so findLatestResumable skips the run.
+- **Module-level SIGINT/SIGTERM handlers were registered at import time and never removed**, accumulating on every test-suite import. Moved registration into `main()`.
+- **cmdQuery ignored the `aborted` field**: SIGINT during a query showed generic `query failed` + exit 1 instead of `aborted by user` + exit 130.
+- **`ingest history --last 0` / `--last abc`** was silently accepted, returning the full list. Now validates and errors.
+- **`ingest history --status foo`** was cast unsafely to `RunStatus[]` and silently returned an empty list for any typo. Now validates against the closed set and errors with the allowed values.
+- `findLatestResumable` and `cmdHistory` used `localeCompare` on fixed-format ISO-8601 strings — locale-dependent and slower. Switched to plain `<` / `>`.
+
+### Changed
+
+- New `setRunStatus(runId, status, opts?)` helper in `runs.ts` collapses the 14 `try { updateRun(...) } catch {}` call sites across `cmdIngest`, `cmdResume`, and `markInterrupted` into a single helper that auto-stamps `finishedAt`, optionally sets/clears `mainSessionId`, and silently swallows disk-write errors. Net: -71 lines from `index.ts`.
 
 ## [1.6.0] - 2026-06-06
 
