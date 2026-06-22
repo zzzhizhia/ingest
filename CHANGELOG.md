@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.8.1] - 2026-06-22
+
+### Changed
+
+- Auto-generated `CLAUDE.md` now documents the `ingest vector` workflow (index, search, similar, cluster, stats) and lists `clusters.org` and `ingest.json` in the knowledge base structure.
+
 ## [1.8.0] - 2026-06-22
 
 ### Added

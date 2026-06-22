@@ -228,10 +228,12 @@ Red flags — stop and fix before proceeding:
 ├── concepts.org   :concept:   Ideas, theories, frameworks, methods
 ├── sources.org    :source:    One summary per ingested source file
 ├── analyses.org   :analysis:  Comparisons, syntheses, deep dives
+├── clusters.org   :analysis:  Generated vector clusters (optional, \`ingest vector cluster\`)
 ├── raw/                       Immutable source material
 │   ├── clips/  books/  papers/  plaud/  assets/
 ├── subs/                      Subwiki knowledge bases
 ├── ingest-lock.json           Digestion state
+├── ingest.json                CLI config (model, effort, vector provider)
 └── CLAUDE.md                  This file
 \`\`\`
 
@@ -293,6 +295,18 @@ Reference attachments via relative path. This keeps related files discoverable a
 
 1. Search the four category files before answering. If the four files don't cover the question, say so — do not answer from training data.
 2. Synthesize an answer with \`[[id:YYYYMMDDTHHMMSS][Title]]\` references.
+
+## Vector Search & Clustering
+
+This wiki can optionally use page-level semantic embeddings for cross-source discovery:
+
+1. Configure a provider in \`ingest.json\` (default: DashScope \`text-embedding-v4\`).
+2. \`ingest vector index\` — embed every wiki page once; incremental re-runs only update changed pages.
+3. \`ingest vector search "query"\` — find semantically similar pages.
+4. \`ingest vector similar <id>\` — pages closest to a given wiki page.
+5. \`ingest vector cluster\` — run K-means and write \`clusters.org\`.
+
+Embeddings are fetched via API but stored locally, so search and clustering are free after indexing.
 `;
 
 
