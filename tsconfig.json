@@ -3,10 +3,14 @@
     "target": "ES2022",
     "module": "ES2022",
     "moduleResolution": "bundler",
+    "baseUrl": ".",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "types": ["node"],
+    "paths": {
+      "#sqlite": ["node:sqlite"]
+    },
     "outDir": "dist",
     "rootDir": "src",
     "declaration": false

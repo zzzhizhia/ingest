@@ -25,7 +25,7 @@ npx @zzzhizhia/ingest init ./wiki
 
 ### Requirements
 
-- Node >= 20
+- Node >= 22.5 (uses `node:sqlite`)
 - `claude` CLI in PATH ([install guide](https://docs.anthropic.com/en/docs/claude-code/overview))
 - rg (ripgrep) for `ingest grep`
 - LibreOffice (optional, for Office file conversion)
@@ -73,8 +73,15 @@ ingest grep "Alice"
 ingest grep "^Claude$"
 
 # Export a wiki page and its linked neighborhood as HTML
-ingest export <id> [--depth N] [--backlinks] [--output PATH] [--open]
+ingest export <id> [--depth N] [--backlinks] [--semantic N] [--output PATH] [--open]
 ingest export --list
+
+# Vector semantic search / clustering (embeddings via API, stored locally in SQLite)
+ingest vector index [--force]                 # index all wiki pages incrementally
+ingest vector search "early AI investment cases"        # semantic search
+ingest vector similar <id> [--limit N]         # pages similar to a wiki page
+ingest vector cluster [--k N] [--output PATH]  # K-means clustering → clusters.org
+ingest vector stats                            # index size and last indexed time
 
 # List past ingest runs (state in $XDG_STATE_HOME/ingest/runs.json)
 ingest history
@@ -97,6 +104,7 @@ ingest resume 01HXYZW...
 | `--verbose` | Stream Claude output in real-time (default: spinner with elapsed time) |
 | `--depth N` | BFS hops for export (default 1) |
 | `--backlinks` | Include reverse links during BFS for export |
+| `--semantic N` | Include top-N semantically similar pages in export (requires `ingest vector index`) |
 | `--output P` | Output HTML path for export |
 | `--output-root D` | Directory for export with auto Denote-style filename |
 | `--open` | Open exported HTML in browser |
@@ -215,11 +223,59 @@ Place `ingest.json` at the org root to override defaults:
   "prompt": {
     "systemAppend": "Additional instructions appended to the system prompt",
     "userPrefix": "Text prepended to the user prompt"
+  },
+  "vector": {
+    "provider": "dashscope",
+    "model": "text-embedding-v4",
+    "apiKey": "sk-...",
+    "apiBase": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+    "dimensions": 1024,
+    "dbPath": "~/.local/state/ingest/vector.db"
   }
 }
 ```
 
 All fields are optional. Missing fields use the defaults shown above. `ingest init` generates a starter config with model and effort.
+
+### Vector config
+
+The `vector` section controls semantic indexing, search, and clustering. Embeddings are computed via an OpenAI-compatible `/embeddings` API and stored in a local SQLite sidecar database (`dbPath`).
+
+| Field | Default | Description |
+|---|---|---|
+| `provider` | `dashscope` | Provider key: `dashscope`, `openai`, `zeroentropyai`, or `ollama` |
+| `model` | `text-embedding-v4` | Embedding model name |
+| `apiKey` | env var | Provider API key. Falls back to `DASHSCOPE_API_KEY`, `OPENAI_API_KEY`, or `ZEROENTROPY_API_KEY` |
+| `apiBase` | provider default | OpenAI-compatible base URL |
+| `dimensions` | provider default | Output dimensions (DashScope v4 default: 1024) |
+| `dbPath` | `~/.local/state/ingest/vector.db` | Local SQLite database for embeddings and clusters |
+
+Example for OpenAI:
+
+```json
+{
+  "vector": {
+    "provider": "openai",
+    "model": "text-embedding-3-small",
+    "apiKey": "sk-...",
+    "apiBase": "https://api.openai.com/v1",
+    "dimensions": 1536
+  }
+}
+```
+
+Example for Ollama:
+
+```json
+{
+  "vector": {
+    "provider": "ollama",
+    "model": "nomic-embed-text",
+    "apiBase": "http://localhost:11434/v1",
+    "dimensions": 768
+  }
+}
+```
 
 ## Supported File Types
 
@@ -285,6 +341,21 @@ The same validation runs as a pre-commit hook. If a commit is rejected during in
 ## Query
 
 `ingest query "question"` invokes Claude in read-only mode against the wiki. Output is rendered with [glow](https://github.com/charmbracelet/glow) in interactive terminals, plain text when piped.
+
+## Vector Search & Clustering
+
+`ingest vector` adds page-level semantic search and clustering on top of the link-based wiki graph. It is useful for discovering cross-source associations that are not explicitly linked.
+
+Workflow:
+
+1. Configure a provider in `ingest.json` (default: DashScope `text-embedding-v4`)
+2. `ingest vector index` — embed every wiki page once; incremental re-runs only update changed pages
+3. `ingest vector search "question"` — find semantically similar pages
+4. `ingest vector similar <id>` — pages closest to a given wiki page
+5. `ingest vector cluster` — run K-means and write `clusters.org`
+6. `ingest export <id> --semantic N` — augment link-based HTML export with N semantically similar pages
+
+Embeddings are fetched via API but stored locally, so search/clustering is free after indexing.
 
 ## What Claude Does
 

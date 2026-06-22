@@ -3,6 +3,9 @@
   "version": "1.7.0",
   "description": "Interactive CLI for ingesting raw files into an org-mode LLM wiki",
   "type": "module",
+  "imports": {
+    "#sqlite": "node:sqlite"
+  },
   "bin": {
     "ingest": "./dist/index.mjs"
   },
@@ -40,6 +43,6 @@
   "homepage": "https://github.com/zzzhizhia/ingest",
   "packageManager": "pnpm@10.33.0",
   "engines": {
-    "node": ">=20"
+    "node": ">=22.5"
   }
 }

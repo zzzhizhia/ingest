@@ -13,6 +13,10 @@ import { visit } from "unist-util-visit";
 
 import { CATEGORY_FILES, EXPECTED_TAG, type CategoryFile } from "./wiki.js";
 
+import { readConfig } from "./config.js";
+import { resolveVectorConfig } from "./vector/config.js";
+import { similarPages } from "./vector/search.js";
+
 const CATEGORY_LABEL = EXPECTED_TAG;
 
 const CATEGORY_ORDER: CategoryFile[] = [...CATEGORY_FILES];
@@ -428,7 +432,7 @@ function buildIdxMetaHtml(
   depth: number,
   backlinks: boolean,
 ): string {
-  return `<p class="idx-meta">起点 <span class="star">&#9733;</span> <a href="#${startPage.id}">${escapeHtml(startPage.title)}</a> &middot; depth=${depth} &middot; backlinks=${backlinks ? "on" : "off"} &middot; 共 ${pageCount} 页</p>`;
+  return `<p class="idx-meta">Start <span class="star">&#9733;</span> <a href="#${startPage.id}">${escapeHtml(startPage.title)}</a> &middot; depth=${depth} &middot; backlinks=${backlinks ? "on" : "off"} &middot; ${pageCount} pages</p>`;
 }
 
 async function buildHtml(
@@ -518,6 +522,8 @@ export type ExportOptions = {
   startId: string;
   depth: number;
   backlinks: boolean;
+  // Number of semantically similar pages to include in addition to BFS.
+  semantic?: number;
   // Full path overrides everything. If omitted, the file goes under
   // outputRoot (or orgRoot when outputRoot is also omitted) with an
   // auto-generated Denote stem.
@@ -542,6 +548,15 @@ export async function runExport(
   }
   const backIndex = buildBackIndex(pages);
   const selected = bfs(opts.startId, byId, backIndex, opts.depth, opts.backlinks);
+
+  // Optional semantic expansion: include top-k pages similar to the start page.
+  if (opts.semantic && opts.semantic > 0) {
+    const vectorConfig = resolveVectorConfig(readConfig(orgRoot).vector, orgRoot);
+    const similar = similarPages(opts.startId, vectorConfig, opts.semantic);
+    for (const { id } of similar) {
+      if (byId.has(id)) selected.add(id);
+    }
+  }
 
   // Order: start page first, then others sorted by [categoryIndex, title].
   const others = [...selected]

@@ -1,6 +1,15 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
+export interface VectorConfig {
+  provider?: string;
+  model?: string;
+  apiKey?: string;
+  apiBase?: string;
+  dimensions?: number;
+  dbPath?: string;
+}
+
 export interface IngestConfig {
   model: string;
   effort: string;
@@ -10,6 +19,7 @@ export interface IngestConfig {
     systemAppend?: string;
     userPrefix?: string;
   };
+  vector?: VectorConfig;
 }
 
 const DEFAULT_ALLOWED_TOOLS = [
@@ -60,6 +70,10 @@ export function readConfig(orgRoot: string): IngestConfig {
     prompt:
       typeof obj.prompt === "object" && obj.prompt !== null
         ? (obj.prompt as IngestConfig["prompt"])
+        : undefined,
+    vector:
+      typeof obj.vector === "object" && obj.vector !== null
+        ? (obj.vector as VectorConfig)
         : undefined,
   };
 }

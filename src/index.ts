@@ -27,6 +27,7 @@ import { cmdGrep } from "./grep.js";
 import { cmdSchedule, deferIngest, parseDelay } from "./schedule.js";
 import { cmdSync } from "./sync.js";
 import { addRun, findLatestResumable, getRun, readRuns, setRunStatus, ulid, updateRun, type RunRecord } from "./runs.js";
+import { cmdVector } from "./vector/index.js";
 
 // ── run tracking (history / resume) ───────────────────────────────────────────
 
@@ -137,6 +138,7 @@ ${pc.bold("Usage")}
   ingest grep <pattern>      show full page(s) whose title matches pattern (alias: rg)
   ingest export <id>         render id + linked neighborhood as one HTML
   ingest export --list       list all wiki pages (id, category, title)
+  ingest vector              vector embedding, search, and clustering
   ingest schedule            list pending scheduled jobs
   ingest schedule cancel     cancel all (or cancel <pid>)
   ingest history             list past ingest runs
@@ -153,6 +155,7 @@ ${pc.bold("Options")}
       --output P  output HTML path for export (full path)
       --output-root D  directory for export with auto Denote-style stem
       --open      open the exported HTML after writing it
+      --semantic N  include top-N semantically similar pages in export
   -V, --version   show version and exit
   -h, --help      show this help and exit
 
@@ -370,7 +373,7 @@ async function cmdExport(args: string[], positional: string[]): Promise<void> {
   if (!args.includes("--list") && !positional[1]) {
     console.error(
       pc.red("✗") +
-        " usage: ingest export <id> [--depth N] [--backlinks] [--output PATH] [--open]",
+        " usage: ingest export <id> [--depth N] [--backlinks] [--semantic N] [--output PATH] [--open]",
     );
     console.error(pc.dim("       ingest export --list   to list available IDs"));
     process.exit(1);
@@ -388,6 +391,12 @@ async function cmdExport(args: string[], positional: string[]): Promise<void> {
     process.exit(1);
   }
   const backlinks = args.includes("--backlinks");
+  const semanticStr = getOpt(args, "--semantic");
+  const semantic = semanticStr ? Number.parseInt(semanticStr, 10) : undefined;
+  if (semanticStr !== undefined && (!Number.isFinite(semantic!) || semantic! < 0)) {
+    console.error(pc.red("✗") + ` invalid --semantic: ${semanticStr}`);
+    process.exit(1);
+  }
   const outputPath = getOpt(args, "--output");
   const outputRoot = getOpt(args, "--output-root");
   try {
@@ -395,6 +404,7 @@ async function cmdExport(args: string[], positional: string[]): Promise<void> {
       startId,
       depth,
       backlinks,
+      semantic,
       outputPath,
       outputRoot,
     });
@@ -864,7 +874,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  const VALUED_FLAGS = new Set(["--at", "--depth", "--output", "--output-root", "--strategy", "--last", "--status"]);
+  const VALUED_FLAGS = new Set(["--at", "--depth", "--output", "--output-root", "--strategy", "--last", "--status", "--k", "--limit"]);
   const positional: string[] = [];
   const flags: string[] = [];
   for (let i = 0; i < args.length; i++) {
@@ -876,9 +886,10 @@ async function main(): Promise<void> {
     }
   }
 
-  const SUBCOMMANDS = new Set(["status", "init", "forget", "lock", "lint", "query", "grep", "rg", "export", "sub", "sync", "schedule", "history", "resume", "man"]);
+  const SUBCOMMANDS = new Set(["status", "init", "forget", "lock", "lint", "query", "grep", "rg", "export", "vector", "sub", "sync", "schedule", "history", "resume", "man"]);
   const GLOBAL_FLAGS = new Set(["-a", "--all", "--at", "--no-pull", "-V", "--version"]);
-  const EXPORT_FLAGS = new Set(["--depth", "--backlinks", "--output", "--output-root", "--open", "--list"]);
+  const EXPORT_FLAGS = new Set(["--depth", "--backlinks", "--output", "--output-root", "--open", "--list", "--semantic"]);
+  const VECTOR_FLAGS = new Set(["--force", "--k", "--limit", "--output"]);
   const LINT_FLAGS = new Set(["--fix"]);
   const SYNC_FLAGS = new Set(["--one-way", "--non-interactive", "--strategy"]);
   const HISTORY_FLAGS = new Set(["--last", "--status"]);
@@ -895,6 +906,7 @@ async function main(): Promise<void> {
     return cmdGrep(orgRoot, positional);
   }
   if (positional[0] === "export") return cmdExport(args, positional);
+  if (positional[0] === "vector") return cmdVector(args);
   if (positional[0] === "sub") return cmdSub(positional);
   if (positional[0] === "sync") return cmdSync(args, positional);
   if (positional[0] === "schedule") return cmdSchedule(positional);
@@ -909,6 +921,7 @@ async function main(): Promise<void> {
 
   const validFlags = new Set([...GLOBAL_FLAGS]);
   if (positional[0] === "export") for (const f of EXPORT_FLAGS) validFlags.add(f);
+  if (positional[0] === "vector") for (const f of VECTOR_FLAGS) validFlags.add(f);
   if (positional[0] === "lint") for (const f of LINT_FLAGS) validFlags.add(f);
   if (positional[0] === "sync") for (const f of SYNC_FLAGS) validFlags.add(f);
   if (positional[0] === "history") for (const f of HISTORY_FLAGS) validFlags.add(f);

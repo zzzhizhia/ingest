@@ -198,7 +198,7 @@ describe("runExport", () => {
     expect(html).toContain('class="idx-meta"');
     expect(html).toContain("depth=1");
     expect(html).toContain("backlinks=off");
-    expect(html).toContain("共 3 页");
+    expect(html).toContain("3 pages");
     expect(html).toContain('<a href="#20260101T000002">'); // in-selection link
     // Out-of-selection link should NOT appear as anchor
     expect(html).not.toContain('href="#99999999T999999"');
