@@ -296,6 +296,17 @@ Reference attachments via relative path. This keeps related files discoverable a
 1. Search the four category files before answering. If the four files don't cover the question, say so — do not answer from training data.
 2. Synthesize an answer with \`[[id:YYYYMMDDTHHMMSS][Title]]\` references.
 
+## Common CLI Commands
+
+- \`ingest\` — interactive checkbox of pending files
+- \`ingest --all\` — ingest all pending files without prompting
+- \`ingest status\` — show pending files and config
+- \`ingest query "question"\` — ask a read-only question against the wiki
+- \`ingest grep <pattern>\` — search page titles and print full pages
+- \`ingest show <id>\` — print the org block of a page by :ID:
+- \`ingest export <id>\` — render a page and its linked neighborhood as HTML
+- \`ingest lint [--fix]\` — validate wiki files and apply safe auto-fixes
+
 ## Vector Search & Clustering
 
 This wiki can optionally use page-level semantic embeddings for cross-source discovery:

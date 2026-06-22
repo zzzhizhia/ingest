@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.8.2] - 2026-06-22
+
+### Changed
+
+- Auto-generated `CLAUDE.md` now includes a `## Common CLI Commands` section documenting `ingest`, `ingest --all`, `ingest status`, `ingest query`, `ingest grep`, `ingest show`, `ingest export`, and `ingest lint`.
+
 ## [1.8.1] - 2026-06-22
 
 ### Changed
