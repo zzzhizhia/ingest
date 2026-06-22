@@ -43,6 +43,9 @@ brew install ripgrep glow libreoffice
 # Interactive checkbox -- select which pending files to ingest
 ingest
 
+# Show detailed help for any subcommand
+ingest <command> --help
+
 # Ingest all pending files without prompting
 ingest --all
 
@@ -71,6 +74,9 @@ ingest query "What do we know about X?"
 # Search wiki pages by title and print full org content
 ingest grep "Alice"
 ingest grep "^Claude$"
+
+# Print a single wiki page by :ID:
+ingest show 20260503T120000
 
 # Export a wiki page and its linked neighborhood as HTML
 ingest export <id> [--depth N] [--backlinks] [--semantic N] [--output PATH] [--open]

@@ -11,7 +11,7 @@ export default defineConfig({
   banner: { js: "#!/usr/bin/env node" },
   target: "node20",
   clean: true,
-  splitting: false,
+  splitting: true,
   define: {
     __README__: JSON.stringify(readme),
     __VERSION__: JSON.stringify(version),

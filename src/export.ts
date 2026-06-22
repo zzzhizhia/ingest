@@ -15,7 +15,6 @@ import { CATEGORY_FILES, EXPECTED_TAG, type CategoryFile } from "./wiki.js";
 
 import { readConfig } from "./config.js";
 import { resolveVectorConfig } from "./vector/config.js";
-import { similarPages } from "./vector/search.js";
 
 const CATEGORY_LABEL = EXPECTED_TAG;
 
@@ -552,6 +551,7 @@ export async function runExport(
   // Optional semantic expansion: include top-k pages similar to the start page.
   if (opts.semantic && opts.semantic > 0) {
     const vectorConfig = resolveVectorConfig(readConfig(orgRoot).vector, orgRoot);
+    const { similarPages } = await import("./vector/search.js");
     const similar = similarPages(opts.startId, vectorConfig, opts.semantic);
     for (const { id } of similar) {
       if (byId.has(id)) selected.add(id);

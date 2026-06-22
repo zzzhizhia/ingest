@@ -26,8 +26,9 @@ import { cmdSubAdd, cmdSubList, cmdSubNew, cmdSubRemove } from "./sub.js";
 import { cmdGrep } from "./grep.js";
 import { cmdSchedule, deferIngest, parseDelay } from "./schedule.js";
 import { cmdSync } from "./sync.js";
+import { cmdShow } from "./show.js";
 import { addRun, findLatestResumable, getRun, readRuns, setRunStatus, ulid, updateRun, type RunRecord } from "./runs.js";
-import { cmdVector } from "./vector/index.js";
+import { VECTOR_HELP } from "./vector/help.js";
 
 // ── run tracking (history / resume) ───────────────────────────────────────────
 
@@ -136,6 +137,7 @@ ${pc.bold("Usage")}
   ingest sub new <name>      create a new local subwiki
   ingest sub remove <n> ...  remove subwiki(s)
   ingest grep <pattern>      show full page(s) whose title matches pattern (alias: rg)
+  ingest show <id>           print the org content of a wiki page by :ID:
   ingest export <id>         render id + linked neighborhood as one HTML
   ingest export --list       list all wiki pages (id, category, title)
   ingest vector              vector embedding, search, and clustering
@@ -159,6 +161,8 @@ ${pc.bold("Options")}
   -V, --version   show version and exit
   -h, --help      show this help and exit
 
+${pc.dim("Run 'ingest <command> --help' for detailed subcommand help.")}
+
 ${pc.bold("Flow")}
   git pull --ff-only (auto stash/pop)
   scan raw/ vs ingest-lock.json → NEW + UPDATED files
@@ -171,6 +175,174 @@ ${pc.bold("Config")}
 
 Wiki root is detected by walking up for a dir containing ${pc.cyan("ingest-lock.json")}.
 `;
+
+const SUBCOMMAND_HELP: Record<string, string> = {
+  status: `\
+${pc.bold("ingest status")}  Show pending files and current config.
+
+${pc.bold("Usage")}
+  ingest status
+
+Shows new and updated files since the last ingest, grouped by subwiki,
+plus the configured model and effort.
+`,
+  init: `\
+${pc.bold("ingest init")}  Scaffold a new ingest wiki.
+
+${pc.bold("Usage")}
+  ingest init [path]
+
+Creates category files, raw/, subs/, ingest-lock.json, ingest.json,
+CLAUDE.md, and git helpers. If the target is a git repo, installs the
+pre-commit lint hook.
+`,
+  forget: `\
+${pc.bold("ingest forget")}  Remove a file from the ingest lock.
+
+${pc.bold("Usage")}
+  ingest forget <path>
+
+Makes the file pending again so the next ingest will reprocess it.
+`,
+  lock: `\
+${pc.bold("ingest lock")}  Mark files as ingested without processing.
+
+${pc.bold("Usage")}
+  ingest lock <path> [path ...]
+
+Writes SHA entries to ingest-lock.json. Useful when a file is already
+represented in the wiki and should be skipped.
+`,
+  lint: `\
+${pc.bold("ingest lint")}  Validate wiki files.
+
+${pc.bold("Usage")}
+  ingest lint
+  ingest lint --fix
+
+Checks headings for tags, IDs, dates, balanced property drawers,
+valid cross-references, and unique IDs. --fix applies safe deterministic
+corrections.
+`,
+  query: `\
+${pc.bold("ingest query")}  Ask a read-only question against the wiki.
+
+${pc.bold("Usage")}
+  ingest query <question>
+
+Invokes Claude with the wiki as context and returns a sourced answer
+with [[id:...][Title]] references.
+`,
+  grep: `\
+${pc.bold("ingest grep")}  Search wiki page titles.
+
+${pc.bold("Usage")}
+  ingest grep <pattern>
+  ingest rg <pattern>
+
+Uses ripgrep (rg) with PCRE2 regex to find top-level headings matching
+<pattern> and prints the full page content.
+`,
+  show: `\
+${pc.bold("ingest show")}  Print the org content of a wiki page by :ID:.
+
+${pc.bold("Usage")}
+  ingest show <id>
+
+Finds the page with the given :ID: across entities.org, concepts.org,
+sources.org, and analyses.org, then prints its raw org block.
+`,
+  export: `\
+${pc.bold("ingest export")}  Export a wiki page and its neighborhood as HTML.
+
+${pc.bold("Usage")}
+  ingest export <id> [--depth N] [--backlinks] [--semantic N] [--output PATH] [--output-root DIR] [--open]
+  ingest export --list
+
+Walks BFS links from <id>, renders the selected pages as a single
+self-contained HTML file, and writes a Denote-style filename if
+--output-root is used. --list prints all wiki page IDs.
+
+${pc.bold("Options")}
+      --depth N     BFS hops (default 1)
+      --backlinks   include reverse links during BFS
+      --semantic N  include top-N semantically similar pages (requires vector index)
+      --output P    output HTML path (full path)
+      --output-root D  directory for auto-named HTML export
+      --open        open the exported HTML after writing it
+`,
+  sub: `\
+${pc.bold("ingest sub")}  Manage subwiki knowledge bases.
+
+${pc.bold("Usage")}
+  ingest sub                        list subwikis
+  ingest sub add <url> [name]       add remote repo as subwiki
+  ingest sub new <name>             create a new local subwiki
+  ingest sub remove <name> [name...]  remove subwiki(s)
+`,
+  sync: `\
+${pc.bold("ingest sync")}  Synchronize pages and files between wikis.
+
+${pc.bold("Usage")}
+  ingest sync <source> [target] [files...] [--one-way] [--strategy <strategy>] [--non-interactive] [--all]
+
+Compares headings and raw files between two wikis and applies changes
+interactively. Use --one-way to copy source → target, --non-interactive
+with --strategy, and --all to include new pages.
+
+${pc.bold("Options")}
+      --one-way          copy source → target only
+      --strategy <name>  resolution strategy: a, b, newest, larger
+      --non-interactive  apply strategy without prompting (requires --strategy)
+  -a, --all              include new pages in the sync
+`,
+  schedule: `\
+${pc.bold("ingest schedule")}  Manage delayed ingest jobs.
+
+${pc.bold("Usage")}
+  ingest schedule                   list pending jobs
+  ingest schedule cancel            cancel all pending jobs
+  ingest schedule cancel <pid> ...  cancel specific jobs
+
+Jobs are created via --at (e.g. ingest --all --at 2h). Each job survives
+terminal close and logs to ~/.local/state/ingest/logs/.
+`,
+  history: `\
+${pc.bold("ingest history")}  List and inspect past ingest runs.
+
+${pc.bold("Usage")}
+  ingest history
+  ingest history --last N
+  ingest history --status in-progress,interrupted,completed
+  ingest history <id>
+
+Runs are stored in $XDG_STATE_HOME/ingest/runs.json and include status,
+timing, and the Claude session id for resumable runs.
+
+${pc.bold("Options")}
+      --last N        show only the last N runs
+      --status S,...  filter by status (comma-separated)
+`,
+  resume: `\
+${pc.bold("ingest resume")}  Resume an interrupted ingest run.
+
+${pc.bold("Usage")}
+  ingest resume [id]
+
+Continues the most recent in-progress or interrupted run for the current
+wiki, or the run matching <id>. Requires the original Claude session to
+still be available.
+`,
+  man: `\
+${pc.bold("ingest man")}  Show the full manual.
+
+${pc.bold("Usage")}
+  ingest man
+
+Renders README.md via glow in a terminal, or prints it as plain text when
+piped.
+`,
+};
 
 // ── fix reporting ─────────────────────────────────────────────────────────────
 
@@ -852,6 +1024,19 @@ async function cmdIngest(args: string[]): Promise<void> {
 // ── main ──────────────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
+  // node:sqlite is experimental and emits a warning on first use. Filter it
+  // out so vector commands stay clean; other warnings are still printed.
+  process.removeAllListeners("warning");
+  process.on("warning", (warning) => {
+    if (
+      warning.name === "ExperimentalWarning" &&
+      warning.message.includes("SQLite")
+    ) {
+      return;
+    }
+    console.warn(warning);
+  });
+
   // Register signal handlers here (not at module load) so test suites that
   // import the module multiple times don't accumulate listeners on process.
   process.on("SIGINT", markInterrupted);
@@ -869,11 +1054,6 @@ async function main(): Promise<void> {
     return;
   }
 
-  if (args.includes("--help") || args.includes("-h")) {
-    process.stdout.write(HELP);
-    return;
-  }
-
   const VALUED_FLAGS = new Set(["--at", "--depth", "--output", "--output-root", "--strategy", "--last", "--status", "--k", "--limit"]);
   const positional: string[] = [];
   const flags: string[] = [];
@@ -886,7 +1066,22 @@ async function main(): Promise<void> {
     }
   }
 
-  const SUBCOMMANDS = new Set(["status", "init", "forget", "lock", "lint", "query", "grep", "rg", "export", "vector", "sub", "sync", "schedule", "history", "resume", "man"]);
+  const SUBCOMMANDS = new Set(["status", "init", "forget", "lock", "lint", "query", "grep", "rg", "show", "export", "vector", "sub", "sync", "schedule", "history", "resume", "man"]);
+
+  if (args.includes("--help") || args.includes("-h")) {
+    const sub = positional[0];
+    if (sub && SUBCOMMANDS.has(sub)) {
+      if (sub === "vector") {
+        process.stdout.write(VECTOR_HELP);
+      } else {
+        const key = sub === "rg" ? "grep" : sub;
+        process.stdout.write(SUBCOMMAND_HELP[key] ?? HELP);
+      }
+      return;
+    }
+    process.stdout.write(HELP);
+    return;
+  }
   const GLOBAL_FLAGS = new Set(["-a", "--all", "--at", "--no-pull", "-V", "--version"]);
   const EXPORT_FLAGS = new Set(["--depth", "--backlinks", "--output", "--output-root", "--open", "--list", "--semantic"]);
   const VECTOR_FLAGS = new Set(["--force", "--k", "--limit", "--output"]);
@@ -905,8 +1100,15 @@ async function main(): Promise<void> {
     const orgRoot = findOrgRoot(process.cwd());
     return cmdGrep(orgRoot, positional);
   }
+  if (positional[0] === "show") {
+    const orgRoot = findOrgRoot(process.cwd());
+    return cmdShow(orgRoot, positional);
+  }
   if (positional[0] === "export") return cmdExport(args, positional);
-  if (positional[0] === "vector") return cmdVector(args);
+  if (positional[0] === "vector") {
+    const { cmdVector } = await import("./vector/index.js");
+    return cmdVector(args);
+  }
   if (positional[0] === "sub") return cmdSub(positional);
   if (positional[0] === "sync") return cmdSync(args, positional);
   if (positional[0] === "schedule") return cmdSchedule(positional);
