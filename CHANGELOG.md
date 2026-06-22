@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.8.0] - 2026-06-22
+
+### Added
+
+- `ingest vector` subcommand family — page-level semantic indexing, search, similarity, and K-means clustering. Embeddings are fetched via an OpenAI-compatible API (default DashScope `text-embedding-v4`) and stored locally in SQLite (`node:sqlite`). Commands: `index`, `search`, `similar`, `cluster`, `stats`.
+- `ingest export --semantic N` — augment link-based HTML export with the top-N semantically similar pages.
+- `ingest show <id>` — print the raw org block of a wiki page by `:ID:`.
+- Independent `--help` text for every subcommand; run `ingest <command> --help` for detailed usage.
+
+### Changed
+
+- Dynamic imports plus `tsup` code splitting so `node:sqlite` is only loaded for vector commands; non-vector commands no longer print the SQLite experimental warning.
+- The SQLite experimental warning is filtered out for vector commands in the CLI while keeping other warnings visible.
+- Auto-generated `CLAUDE.md` template now notes that `raw/` files may be modified when explicitly instructed.
+
 ## [1.7.0] - 2026-06-12
 
 ### Added
