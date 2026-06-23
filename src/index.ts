@@ -138,6 +138,7 @@ ${pc.bold("Usage")}
   ingest sub remove <n> ...  remove subwiki(s)
   ingest grep <pattern>      show full page(s) whose title matches pattern (alias: rg)
   ingest show <id>           print the org content of a wiki page by :ID:
+  ingest view <id>           alias for ingest show
   ingest export <id>         render id + linked neighborhood as one HTML
   ingest export --list       list all wiki pages (id, category, title)
   ingest vector              vector embedding, search, and clustering
@@ -1066,7 +1067,7 @@ async function main(): Promise<void> {
     }
   }
 
-  const SUBCOMMANDS = new Set(["status", "init", "forget", "lock", "lint", "query", "grep", "rg", "show", "export", "vector", "sub", "sync", "schedule", "history", "resume", "man"]);
+  const SUBCOMMANDS = new Set(["status", "init", "forget", "lock", "lint", "query", "grep", "rg", "show", "view", "export", "vector", "sub", "sync", "schedule", "history", "resume", "man"]);
 
   if (args.includes("--help") || args.includes("-h")) {
     const sub = positional[0];
@@ -1074,7 +1075,7 @@ async function main(): Promise<void> {
       if (sub === "vector") {
         process.stdout.write(VECTOR_HELP);
       } else {
-        const key = sub === "rg" ? "grep" : sub;
+        const key = sub === "rg" ? "grep" : sub === "view" ? "show" : sub;
         process.stdout.write(SUBCOMMAND_HELP[key] ?? HELP);
       }
       return;
@@ -1100,7 +1101,7 @@ async function main(): Promise<void> {
     const orgRoot = findOrgRoot(process.cwd());
     return cmdGrep(orgRoot, positional);
   }
-  if (positional[0] === "show") {
+  if (positional[0] === "show" || positional[0] === "view") {
     const orgRoot = findOrgRoot(process.cwd());
     return cmdShow(orgRoot, positional);
   }

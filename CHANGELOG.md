@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.8.3] - 2026-06-23
+
+### Added
+
+- `ingest view <id>` as an alias for `ingest show <id>`.
+
 ## [1.8.2] - 2026-06-22
 
 ### Changed

@@ -303,7 +303,7 @@ Reference attachments via relative path. This keeps related files discoverable a
 - \`ingest status\` — show pending files and config
 - \`ingest query "question"\` — ask a read-only question against the wiki
 - \`ingest grep <pattern>\` — search page titles and print full pages
-- \`ingest show <id>\` — print the org block of a page by :ID:
+- \`ingest show <id>\` — print the org block of a page by :ID: (alias: \`ingest view\`)
 - \`ingest export <id>\` — render a page and its linked neighborhood as HTML
 - \`ingest lint [--fix]\` — validate wiki files and apply safe auto-fixes
 

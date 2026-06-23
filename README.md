@@ -77,6 +77,7 @@ ingest grep "^Claude$"
 
 # Print a single wiki page by :ID:
 ingest show 20260503T120000
+ingest view 20260503T120000
 
 # Export a wiki page and its linked neighborhood as HTML
 ingest export <id> [--depth N] [--backlinks] [--semantic N] [--output PATH] [--open]
