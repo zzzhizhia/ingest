@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import { basename } from "node:path";
 import pc from "picocolors";
@@ -79,6 +80,11 @@ export async function invokeClaude(opts: ClaudeRunOpts): Promise<ClaudeResult> {
       : opts.systemPrompt;
 
   return new Promise((resolve) => {
+    // Generate a session ID upfront so it is known even when the process is
+    // interrupted before producing the final JSON output (which is where
+    // `session_id` normally appears). On resume we reuse the existing ID.
+    const sessionId = opts.resumeSessionId ?? randomUUID();
+
     const args = [
       "-p",
       "--bare",
@@ -89,7 +95,11 @@ export async function invokeClaude(opts: ClaudeRunOpts): Promise<ClaudeResult> {
       "--output-format", "json",
     ];
     if (systemPrompt) args.push("--system-prompt", systemPrompt);
-    if (opts.resumeSessionId) args.push("--resume", opts.resumeSessionId);
+    if (opts.resumeSessionId) {
+      args.push("--resume", opts.resumeSessionId);
+    } else {
+      args.push("--session-id", sessionId);
+    }
 
     const child = spawn("claude", args, {
       cwd: opts.orgRoot,
@@ -141,7 +151,7 @@ export async function invokeClaude(opts: ClaudeRunOpts): Promise<ClaudeResult> {
       if (spinnerInterval) clearInterval(spinnerInterval);
       const elapsed = formatElapsed(Date.now() - startTime);
 
-      const { result: output, sessionId } = parseClaudeJson(raw);
+      const { result: output } = parseClaudeJson(raw);
       const doneLabel = opts.doneLabel ?? opts.label;
       const prefix = isTTY ? "\r" : "";
       if (opts.captureOutput) {
