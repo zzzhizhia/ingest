@@ -5,11 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [1.9.0] - 2026-07-01
+## [1.9.1] - 2026-07-02
 
 ### Changed
 
 - `ingest` and `ingest status` now show only the main repository's pending files by default. Subwiki files under `subs/` are included only when `--subs` is passed. This also applies to `ingest --all --subs`.
+
+## [1.9.0] - 2026-07-01
+
+### Changed
+
 - Removed the "`raw/` is immutable" and "never modify `raw/`" requirements from the auto-generated `CLAUDE.md`, the digest `SYSTEM_PROMPT`, the query `SYSTEM_PROMPT`, and `README.md`. `raw/` remains the canonical source location, but edits are no longer forbidden.
 
 ## [1.8.3] - 2026-06-23
