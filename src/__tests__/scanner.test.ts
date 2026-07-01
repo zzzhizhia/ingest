@@ -128,4 +128,22 @@ describe("scanPendingFiles", () => {
     expect(results.find((f) => f.rel === "raw/a.org")?.status).toBe("new");
     expect(results.find((f) => f.rel === "raw/b.md")?.status).toBe("updated");
   });
+
+  it("ignores subwiki files by default", () => {
+    makeOrg(TMP, "raw/main.org", "main");
+    makeOrg(TMP, "subs/math/raw/note.org", "note");
+    const results = scanPendingFiles(TMP, emptyLock());
+    expect(results.map((r) => r.rel)).toEqual(["raw/main.org"]);
+  });
+
+  it("includes subwiki files when includeSubs is true", () => {
+    makeOrg(TMP, "raw/main.org", "main");
+    makeOrg(TMP, "subs/math/raw/note.org", "note");
+    const results = scanPendingFiles(TMP, emptyLock(), true);
+    const rels = results.map((r) => r.rel).sort();
+    expect(rels).toEqual(["raw/main.org", "subs/math/raw/note.org"]);
+    expect(results.find((f) => f.rel === "subs/math/raw/note.org")?.submoduleRoot).toBe(
+      join(TMP, "subs/math"),
+    );
+  });
 });

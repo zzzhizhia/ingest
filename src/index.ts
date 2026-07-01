@@ -151,6 +151,7 @@ ${pc.bold("Usage")}
 
 ${pc.bold("Options")}
   -a, --all       ingest all pending files without prompting
+      --subs      include subwiki files in the pending list
       --at T      delay execution (e.g. 30m, 2h, 09:00; survives terminal close)
       --no-pull   skip git pull and subwiki sync before ingesting
       --depth N   BFS hops for export (default 1)
@@ -183,9 +184,11 @@ ${pc.bold("ingest status")}  Show pending files and current config.
 
 ${pc.bold("Usage")}
   ingest status
+  ingest status --subs
 
 Shows new and updated files since the last ingest, grouped by subwiki,
-plus the configured model and effort.
+plus the configured model and effort. By default only the main repo is
+shown; use --subs to include subwiki files.
 `,
   init: `\
 ${pc.bold("ingest init")}  Scaffold a new ingest wiki.
@@ -366,11 +369,12 @@ async function cmdMan(): Promise<void> {
   }
 }
 
-function cmdStatus(): void {
+function cmdStatus(args: string[]): void {
   const orgRoot = findOrgRoot(process.cwd());
   const config = readConfig(orgRoot);
   const lock = readLock(orgRoot);
-  const pending = scanPendingFiles(orgRoot, lock);
+  const includeSubs = args.includes("--subs");
+  const pending = scanPendingFiles(orgRoot, lock, includeSubs);
   if (pending.length === 0) {
     console.log(pc.green("✓") + " all files up to date");
     return;
@@ -798,6 +802,7 @@ async function cmdIngest(args: string[]): Promise<void> {
   }
 
   const allFlag = args.includes("--all") || args.includes("-a");
+  const includeSubs = args.includes("--subs");
   const explicitFiles = args.filter((a) => !a.startsWith("-"));
 
   const lock = readLock(orgRoot);
@@ -809,7 +814,7 @@ async function cmdIngest(args: string[]): Promise<void> {
       status: lock.files[rel] ? "updated" : "new",
     }));
   } else {
-    const pending = scanPendingFiles(orgRoot, lock);
+    const pending = scanPendingFiles(orgRoot, lock, includeSubs);
 
     if (pending.length === 0) {
       console.log(pc.green("✓") + " all files up to date");
@@ -1083,7 +1088,7 @@ async function main(): Promise<void> {
     process.stdout.write(HELP);
     return;
   }
-  const GLOBAL_FLAGS = new Set(["-a", "--all", "--at", "--no-pull", "-V", "--version"]);
+  const GLOBAL_FLAGS = new Set(["-a", "--all", "--subs", "--at", "--no-pull", "-V", "--version"]);
   const EXPORT_FLAGS = new Set(["--depth", "--backlinks", "--output", "--output-root", "--open", "--list", "--semantic"]);
   const VECTOR_FLAGS = new Set(["--force", "--k", "--limit", "--output"]);
   const LINT_FLAGS = new Set(["--fix"]);
@@ -1091,7 +1096,7 @@ async function main(): Promise<void> {
   const HISTORY_FLAGS = new Set(["--last", "--status"]);
 
   if (positional[0] === "man") return cmdMan();
-  if (positional[0] === "status") return cmdStatus();
+  if (positional[0] === "status") return cmdStatus(args);
   if (positional[0] === "init") return cmdInit(positional);
   if (positional[0] === "forget") return cmdForget(positional);
   if (positional[0] === "lock") return cmdLock(positional);

@@ -49,6 +49,7 @@ function* walkDir(dir: string, submoduleRoot?: string): Generator<{ abs: string;
 export function scanPendingFiles(
   orgRoot: string,
   lock: LockFile,
+  includeSubs = false,
 ): PendingFile[] {
   const locked = lock.files ?? {};
   const results: PendingFile[] = [];
@@ -57,7 +58,7 @@ export function scanPendingFiles(
     { dir: join(orgRoot, "raw") },
   ];
   const subsDir = join(orgRoot, "subs");
-  if (existsSync(subsDir)) {
+  if (includeSubs && existsSync(subsDir)) {
     for (const entry of readdirSync(subsDir, { withFileTypes: true })) {
       if (entry.isDirectory()) {
         const full = join(subsDir, entry.name);

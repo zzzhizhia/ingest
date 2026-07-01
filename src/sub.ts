@@ -36,7 +36,7 @@ function listSubwikis(orgRoot: string): SubwikiInfo[] {
     const subPath = `subs/${entry.name}`;
     const url = getSubmoduleUrl(orgRoot, subPath);
     const lock = readLock(orgRoot);
-    const pending = scanPendingFiles(orgRoot, lock).filter(
+    const pending = scanPendingFiles(orgRoot, lock, true).filter(
       (f) => f.submoduleRoot === fullPath,
     );
 
