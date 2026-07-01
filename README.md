@@ -178,7 +178,7 @@ Key properties:
 - **Tag** -- One of `:entity:`, `:concept:`, `:source:`, `:analysis:`, must match the file
 - **Cross-references** -- Bidirectional `[[id:...][Title]]` links between pages
 
-**Source files** under `raw/` are immutable -- ingest never modifies them. They use [Denote naming](https://protesilaos.com/emacs/denote): `{YYYYMMDDTHHMMSS}--{title}__{tags}.ext`.
+**Source files** under `raw/` are the canonical inputs for digestion. They use [Denote naming](https://protesilaos.com/emacs/denote): `{YYYYMMDDTHHMMSS}--{title}__{tags}.ext`.
 
 **Subwiki knowledge bases** under `subs/` are fully independent: own category files, own raw/, own git history. Useful for team/project wikis with different access permissions.
 

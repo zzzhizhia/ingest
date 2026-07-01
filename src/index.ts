@@ -491,7 +491,7 @@ You are a query engine for an org-mode knowledge base. Answer the user's questio
 
 ## Iron Law
 
-\`raw/\` is immutable. Every answer cites a source: \`[[id:YYYYMMDDTHHMMSS][Title]]\` references to wiki pages, or \`raw/path/to/source.ext\` for direct source quotes. Do not fabricate. Cross-references are bidirectional.
+\`raw/\` holds source material. Every answer cites a source: \`[[id:YYYYMMDDTHHMMSS][Title]]\` references to wiki pages, or \`raw/path/to/source.ext\` for direct source quotes. Do not fabricate. Cross-references are bidirectional.
 
 ## Wiki Files
 

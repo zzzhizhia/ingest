@@ -11,7 +11,7 @@ describe("SYSTEM_PROMPT", () => {
 
   it("contains the Iron Law invariant", () => {
     expect(SYSTEM_PROMPT).toContain("## Iron Law");
-    expect(SYSTEM_PROMPT).toMatch(/`?raw\/`?\s+is immutable/);
+    expect(SYSTEM_PROMPT).toMatch(/`?raw\/`?\s+holds source material/);
   });
 
   it("contains red flags and the three canonical stops", () => {
@@ -20,7 +20,7 @@ describe("SYSTEM_PROMPT", () => {
     expect(SYSTEM_PROMPT).toContain("bidirectional");
   });
 
-  it("contains Pre-Save Self-Check with the 6 items", () => {
+  it("contains Pre-Save Self-Check with the 5 items", () => {
     expect(SYSTEM_PROMPT).toContain("Pre-Save Self-Check");
     expect(SYSTEM_PROMPT).toContain("[unverified]");
   });

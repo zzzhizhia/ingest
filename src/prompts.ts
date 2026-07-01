@@ -9,7 +9,7 @@ All wiki files live at the knowledge base root.
 
 ## Iron Law
 
-\`raw/\` is immutable. Every wiki claim must cite a source: entities/concepts/sources point to \`raw/path/to/source.ext\`; analyses may point to \`[[id:YYYYMMDDTHHMMSS][Title]]\` (synthesized from other wiki pages). Cross-source synthesis is \`LOW\` confidence by default. Cross-references must be bidirectional.
+\`raw/\` holds source material. Every wiki claim must cite a source: entities/concepts/sources point to \`raw/path/to/source.ext\`; analyses may point to \`[[id:YYYYMMDDTHHMMSS][Title]]\` (synthesized from other wiki pages). Cross-source synthesis is \`LOW\` confidence by default. Cross-references must be bidirectional.
 
 Red flags — stop and fix before proceeding:
 - You wrote a claim without a \`:SOURCES:\` line
@@ -111,7 +111,6 @@ Before saving each heading, verify:
 - \`:DATE:\` is set
 - \`:SOURCES:\` points to a real \`raw/\` file or \`[[id:...]]\`
 - Cross-references are bidirectional (A→B means B→A)
-- No edits to \`raw/\`
 
 ## Workflow B: Re-Digestion ([UPDATED] files)
 
