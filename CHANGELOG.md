@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.9.2] - 2026-07-03
+
+### Added
+
+- Safety rule: never edit the four wiki files directly (entities.org, concepts.org, sources.org, analyses.org); only `ingest` may modify them. Added to the auto-generated `CLAUDE.md` and the digest `SYSTEM_PROMPT`.
+
 ## [1.9.1] - 2026-07-02
 
 ### Changed
