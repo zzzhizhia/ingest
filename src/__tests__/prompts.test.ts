@@ -54,14 +54,16 @@ describe("buildPrompt", () => {
   const orgRoot = "/org";
   const emptyPdf = new Map<string, string>();
 
-  it("lists files with [NEW] / [UPDATED] tags", () => {
+  it("lists files with [NEW] / [UPD] / [REN] tags", () => {
     const files: PendingFile[] = [
       { rel: "raw/a.org", status: "new" },
       { rel: "raw/b.md", status: "updated" },
+      { rel: "raw/c.org", status: "renamed", renamedFrom: "raw/old-c.org" },
     ];
     const result = buildPrompt(orgRoot, files, emptyPdf);
     expect(result).toContain("[NEW] raw/a.org");
-    expect(result).toContain("[UPDATED] raw/b.md");
+    expect(result).toContain("[UPD] raw/b.md");
+    expect(result).toContain("[REN raw/old-c.org] raw/c.org");
   });
 
   it("includes PDF note for converted files", () => {
@@ -108,9 +110,11 @@ describe("buildFixPrompt", () => {
   it("includes error output and file list", () => {
     const files: PendingFile[] = [
       { rel: "raw/a.org", status: "new" },
+      { rel: "raw/b.org", status: "renamed", renamedFrom: "raw/old-b.org" },
     ];
     const result = buildFixPrompt("LINK: broken id:XXX", files);
     expect(result).toContain("LINK: broken id:XXX");
     expect(result).toContain("[NEW] raw/a.org");
+    expect(result).toContain("[REN raw/old-b.org] raw/b.org");
   });
 });

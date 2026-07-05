@@ -85,11 +85,19 @@ function findOrgRoot(start: string): string {
 
 async function selectFiles(pending: PendingFile[]): Promise<PendingFile[]> {
   const choices = pending.map((f) => {
-    const tag = f.status === "new" ? pc.green("[NEW]") : pc.yellow("[UPD]");
+    let tag: string;
+    if (f.status === "renamed") {
+      tag = pc.blue("[REN]");
+    } else if (f.status === "new") {
+      tag = pc.green("[NEW]");
+    } else {
+      tag = pc.yellow("[UPD]");
+    }
     const scope = f.submoduleRoot ? pc.dim(` (${basename(f.submoduleRoot)})`) : "";
-    return { name: `${tag} ${f.rel}${scope}`, value: f };
+    const via = f.renamedFrom ? pc.dim(`  ← ${f.renamedFrom}`) : "";
+    return { name: `${tag} ${f.rel}${scope}${via}`, value: f };
   });
-  return withQuit(checkbox, {
+  const selected = await withQuit(checkbox, {
     message: `Select files to ingest  ${pc.dim("(space: toggle, a: all, enter: confirm, q: quit)")}`,
     choices,
     pageSize: 25,
@@ -101,6 +109,8 @@ async function selectFiles(pending: PendingFile[]): Promise<PendingFile[]> {
       },
     },
   });
+  // Renamed files (pure rename, content unchanged) don't need re-ingestion.
+  return selected.filter((f) => f.status !== "renamed");
 }
 
 // ── option parsing ────────────────────────────────────────────────────────────
@@ -125,7 +135,7 @@ ${pc.bold("ingest")}  Interactive ingest for an org-mode LLM wiki via ${pc.cyan(
 ${pc.bold("Usage")}
   ingest                     interactive checkbox of pending files
   ingest <path> [path ...]   ingest specific files directly
-  ingest status              show pending files (new + updated)
+  ingest status              show pending files (new + updated + renamed)
   ingest init [path]         scaffold blank wiki (+ pre-commit hook if git repo)
   ingest forget <path>       remove file from lock (makes it pending again)
   ingest lock <path> [...]   write file SHA to lock (skip ingest, mark done)
@@ -167,7 +177,7 @@ ${pc.dim("Run 'ingest <command> --help' for detailed subcommand help.")}
 
 ${pc.bold("Flow")}
   git pull --ff-only (auto stash/pop)
-  scan raw/ vs ingest-lock.json → NEW + UPDATED files
+  scan raw/ vs ingest-lock.json → NEW + UPD + REN files
   claude -p --bare --model sonnet (single session for all selected files)
   write ingest-lock.json + git commit (with safe fix + LLM fix retry) + git push
 
@@ -186,7 +196,7 @@ ${pc.bold("Usage")}
   ingest status
   ingest status --subs
 
-Shows new and updated files since the last ingest, grouped by subwiki,
+Shows new, updated, and renamed files since the last ingest, grouped by subwiki,
 plus the configured model and effort. By default only the main repo is
 shown; use --subs to include subwiki files.
 `,
@@ -381,6 +391,7 @@ function cmdStatus(args: string[]): void {
   }
   const newFiles = pending.filter((f) => f.status === "new");
   const updated = pending.filter((f) => f.status === "updated");
+  const renamed = pending.filter((f) => f.status === "renamed");
   if (newFiles.length > 0) {
     console.log(pc.bold(`${newFiles.length} new`));
     for (const f of newFiles) {
@@ -392,15 +403,26 @@ function cmdStatus(args: string[]): void {
     console.log(pc.bold(`${updated.length} updated`));
     for (const f of updated) {
       const scope = f.submoduleRoot ? pc.dim(` (${basename(f.submoduleRoot)})`) : "";
-      console.log(pc.yellow("  ~ ") + f.rel + scope);
+      const via = f.renamedFrom ? pc.dim(`  ← ${f.renamedFrom}`) : "";
+      console.log(pc.yellow("  ~ ") + f.rel + scope + via);
     }
   }
+  if (renamed.length > 0) {
+    console.log(pc.bold(`${renamed.length} renamed`) + pc.dim(" (unchanged)"));
+    for (const f of renamed) {
+      const scope = f.submoduleRoot ? pc.dim(` (${basename(f.submoduleRoot)})`) : "";
+      console.log(pc.blue("  → ") + f.rel + scope + pc.dim(`  ← ${f.renamedFrom}`));
+    }
+  }
+  const actionCount = newFiles.length + updated.length;
   const smCount = new Set(pending.filter((f) => f.submoduleRoot).map((f) => f.submoduleRoot)).size;
   const mainCount = pending.filter((f) => !f.submoduleRoot).length;
   if (smCount > 0) {
     console.log(pc.dim(`\n${smCount} subwiki${smCount === 1 ? "" : "s"}, ${mainCount} main-repo file${mainCount === 1 ? "" : "s"}`));
   }
-  console.log(pc.dim(`model: ${config.model}, effort: ${config.effort}`));
+  if (actionCount > 0 || renamed.length > 0) {
+    console.log(pc.dim(`model: ${config.model}, effort: ${config.effort}`));
+  }
 }
 
 function cmdInit(positional: string[]): void {
@@ -821,10 +843,16 @@ async function cmdIngest(args: string[]): Promise<void> {
       return;
     }
 
+    const actionable = pending.filter((f) => f.status !== "renamed");
+    if (actionable.length === 0) {
+      console.log(pc.green("✓") + " all files up to date");
+      return;
+    }
+
     console.log(pc.bold(`\n${pending.length} file${pending.length === 1 ? "" : "s"} pending\n`));
 
     if (allFlag) {
-      toIngest = pending;
+      toIngest = pending.filter((f) => f.status !== "renamed");
     } else {
       toIngest = await selectFiles(pending);
       if (toIngest.length === 0) {
@@ -836,9 +864,17 @@ async function cmdIngest(args: string[]): Promise<void> {
 
   if (allFlag || explicitFiles.length > 0) {
     for (const f of toIngest) {
-      const tag = f.status === "new" ? pc.green("[NEW]") : pc.yellow("[UPD]");
+      let tag: string;
+      if (f.status === "renamed") {
+        tag = pc.blue("[REN]");
+      } else if (f.status === "new") {
+        tag = pc.green("[NEW]");
+      } else {
+        tag = pc.yellow("[UPD]");
+      }
       const scope = f.submoduleRoot ? pc.dim(` (${basename(f.submoduleRoot)})`) : "";
-      console.log(`  ${tag} ${f.rel}${scope}`);
+      const via = f.renamedFrom ? pc.dim(`  ← ${f.renamedFrom}`) : "";
+      console.log(`  ${tag} ${f.rel}${scope}${via}`);
     }
   }
 

@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.9.3] - 2026-07-06
+
+### Fixed
+
+- Renamed `raw/` files were shown as `[NEW]` in the pending list. `scanPendingFiles()` now uses `git diff --cached --find-renames` (via a temp index) to detect renames. Pure renames (content unchanged) show as `[REN]` and are skipped; renames with modifications show as `[UPD]` with the old path noted.
+- Deleted `raw/` files now automatically clean up orphaned entries in `ingest-lock.json`.
+
 ## [1.9.2] - 2026-07-03
 
 ### Added

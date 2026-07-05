@@ -78,12 +78,14 @@ Do not create pages for trivial content (one-off events, transient numbers).
 
 ## User Input Format
 
-Each file comes tagged with \`[NEW]\` or \`[UPDATED]\`, corresponding to two separate workflows:
+Each file comes tagged with \`[NEW]\`, \`[UPD]\`, or \`[REN]\`:
 
 - **[NEW]** = This source has never been digested (not in \`ingest-lock.json\`).
-- **[UPDATED]** = This source was previously digested but has changed (hash mismatch in lock).
+- **[UPD]** = This source was previously digested but has changed (hash mismatch in lock).
+- **[REN]** = This source was renamed (and optionally modified). The tag includes the old path: \`[REN old/path]\`.
+  When searching the wiki for existing pages referencing this source, also try the old path.
 
-## Workflow A: New Digestion ([NEW] files)
+## Workflow A: New Digestion ([NEW])
 
 1. **Read the source file**: use the Read tool. For files > 200KB, read in chunks.
 2. **Validate**: if the file is missing or empty, skip and report.
@@ -112,7 +114,7 @@ Before saving each heading, verify:
 - \`:SOURCES:\` points to a real \`raw/\` file or \`[[id:...]]\`
 - Cross-references are bidirectional (A→B means B→A)
 
-## Workflow B: Re-Digestion ([UPDATED] files)
+## Workflow B: Re-Digestion ([UPD])
 
 The source file has changed; the wiki already has pages referencing this source. **The goal is to diff out newly added/modified content and merge it into the wiki** — not to rewrite from scratch.
 
@@ -195,7 +197,14 @@ export function buildPrompt(
 ): string {
   const list = files
     .map((f, i) => {
-      const tag = f.status === "new" ? "[NEW]" : "[UPDATED]";
+      let tag: string;
+      if (f.status === "renamed") {
+        tag = f.renamedFrom ? `[REN ${f.renamedFrom}]` : "[REN]";
+      } else if (f.status === "new") {
+        tag = "[NEW]";
+      } else {
+        tag = "[UPD]";
+      }
       const displayPath = submoduleRoot
         ? relative(submoduleRoot, join(orgRoot, f.rel))
         : f.rel;
@@ -221,7 +230,14 @@ export function buildFixPrompt(
 ): string {
   const list = files
     .map((f, i) => {
-      const tag = f.status === "new" ? "[NEW]" : "[UPDATED]";
+      let tag: string;
+      if (f.status === "renamed") {
+        tag = f.renamedFrom ? `[REN ${f.renamedFrom}]` : "[REN]";
+      } else if (f.status === "new") {
+        tag = "[NEW]";
+      } else {
+        tag = "[UPD]";
+      }
       return `${i + 1}. ${tag} ${f.rel}`;
     })
     .join("\n");
