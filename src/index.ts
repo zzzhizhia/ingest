@@ -996,12 +996,16 @@ async function cmdIngest(args: string[]): Promise<void> {
   }
 
   // ── commit main repo ──
-  const mainFilePaths = mainFiles.map((f) => f.rel);
+  const mainCommitFiles: PendingFile[] = [];
+  for (const f of toIngest) {
+    if (f.submoduleRoot) continue;
+    mainCommitFiles.push(f);
+  }
   const MAX_FIX_ATTEMPTS = 2;
 
   let result: CommitResult;
   try {
-    result = commitIngest(orgRoot, mainFilePaths, committedSubmodules, mainOutput);
+    result = commitIngest(orgRoot, mainCommitFiles, committedSubmodules, mainOutput);
   } catch (e) {
     setRunStatus(runId, "interrupted");
     console.warn(pc.yellow("⚠") + " git commit failed:", (e as Error).message);
@@ -1023,7 +1027,7 @@ async function cmdIngest(args: string[]): Promise<void> {
     if (safe.applied.length > 0) {
       console.log();
       try {
-        result = commitIngest(orgRoot, mainFilePaths, committedSubmodules, mainOutput);
+        result = commitIngest(orgRoot, mainCommitFiles, committedSubmodules, mainOutput);
       } catch (e) {
         setRunStatus(runId, "interrupted");
         console.warn(pc.yellow("⚠") + " git commit failed:", (e as Error).message);
@@ -1044,7 +1048,7 @@ async function cmdIngest(args: string[]): Promise<void> {
       break;
     }
     try {
-      result = commitIngest(orgRoot, mainFilePaths, committedSubmodules, mainOutput);
+      result = commitIngest(orgRoot, mainCommitFiles, committedSubmodules, mainOutput);
     } catch (e) {
       setRunStatus(runId, "interrupted");
       console.warn(pc.yellow("⚠") + " git commit failed:", (e as Error).message);

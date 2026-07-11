@@ -94,10 +94,16 @@ export function commitSubmodule(
       ? basename(files[0].rel)
       : `${files.length} files`;
 
-  execFileSync("git", ["add", ...SUBMODULE_WIKI_FILES], { cwd: submoduleRoot, stdio: "pipe" });
+  // Stage renamed raw/ files so the submodule records the rename.
+  const renamedRaws = files
+    .filter((f) => f.status === "renamed" && f.rel.startsWith("raw/"))
+    .map((f) => f.rel);
+  const toAdd = [...SUBMODULE_WIKI_FILES, ...renamedRaws];
+
+  execFileSync("git", ["add", ...toAdd], { cwd: submoduleRoot, stdio: "pipe" });
 
   const hasChanges =
-    execFileSync("git", ["status", "--porcelain", ...SUBMODULE_WIKI_FILES], {
+    execFileSync("git", ["status", "--porcelain", ...toAdd], {
       cwd: submoduleRoot,
     })
       .toString()
@@ -122,17 +128,24 @@ export function commitSubmodule(
 
 export function commitIngest(
   orgRoot: string,
-  files: string[],
+  files: PendingFile[],
   submodulePaths: string[] = [],
   body?: string,
 ): CommitResult {
   const label =
     files.length === 1
-      ? basename(files[0])
+      ? basename(files[0].rel)
       : `${files.length} files`;
 
-  const sources = sourcePathsToAdd(orgRoot, files);
-  const allPaths = [...WIKI_FILES, ...sources, ...submodulePaths];
+  const normalRels = files
+    .filter((f) => f.status !== "renamed")
+    .map((f) => f.rel);
+  const renamedRels = files
+    .filter((f) => f.status === "renamed")
+    .map((f) => f.rel);
+
+  const sources = sourcePathsToAdd(orgRoot, normalRels);
+  const allPaths = [...WIKI_FILES, ...sources, ...renamedRels, ...submodulePaths];
 
   execFileSync("git", ["add", ...allPaths], { cwd: orgRoot, stdio: "pipe" });
 
