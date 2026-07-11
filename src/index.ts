@@ -844,6 +844,7 @@ async function cmdIngest(args: string[]): Promise<void> {
     }
 
     const actionable = pending.filter((f) => f.status !== "renamed");
+    const renamed = pending.filter((f) => f.status === "renamed");
     if (actionable.length === 0) {
       console.log(pc.green("✓") + " all files up to date");
       return;
@@ -852,12 +853,19 @@ async function cmdIngest(args: string[]): Promise<void> {
     console.log(pc.bold(`\n${pending.length} file${pending.length === 1 ? "" : "s"} pending\n`));
 
     if (allFlag) {
-      toIngest = pending.filter((f) => f.status !== "renamed");
+      toIngest = actionable;
     } else {
       toIngest = await selectFiles(pending);
       if (toIngest.length === 0) {
         console.log(pc.dim("skipped"));
         return;
+      }
+    }
+
+    // Renamed files need to be staged so the user's git records the rename.
+    for (const f of renamed) {
+      if (!toIngest.some((x) => x.rel === f.rel)) {
+        toIngest.push(f);
       }
     }
   }
@@ -878,10 +886,11 @@ async function cmdIngest(args: string[]): Promise<void> {
     }
   }
 
-  // ── group files by subwiki ──
+  // ── group files by subwiki (renamed files don't need Claude) ──
   const mainFiles: PendingFile[] = [];
   const submoduleGroups = new Map<string, PendingFile[]>();
   for (const f of toIngest) {
+    if (f.status === "renamed") continue;
     if (f.submoduleRoot) {
       const group = submoduleGroups.get(f.submoduleRoot) ?? [];
       group.push(f);
@@ -894,6 +903,7 @@ async function cmdIngest(args: string[]): Promise<void> {
   // ── pre-conversion (Office → PDF) ──
   const convertedMap = new Map<string, string>();
   for (const f of toIngest) {
+    if (f.status === "renamed") continue;
     if (isOfficeFile(f.rel)) {
       process.stdout.write(pc.dim(`→ converting ${f.rel}...`));
       const pdf = convertOfficeToPdf(orgRoot, f.rel);

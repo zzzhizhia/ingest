@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.9.4] - 2026-07-06
+
+### Fixed
+
+- Renamed `raw/` files are now staged alongside the wiki commit, so the user's git records the rename. They are still not sent to Claude for re-digestion unless the content also changed.
+
 ## [1.9.3] - 2026-07-06
 
 ### Fixed
